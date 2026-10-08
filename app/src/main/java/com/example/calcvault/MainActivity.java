@@ -644,14 +644,24 @@ public class MainActivity extends Activity {
         box.addView(count,new LinearLayout.LayoutParams(-1,dp(32)));
 
         input.addTextChangedListener(new android.text.TextWatcher(){
+            private boolean fixing=false;
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int before,int countChanged){
-                int words=countWords(s.toString());
+            public void onTextChanged(CharSequence s,int st,int before,int countChanged){}
+            public void afterTextChanged(android.text.Editable e){
+                if(fixing)return;
+                fixing=true;
+                String value=e.toString();
+                String limited=limitTo15Words(value);
+                if(!value.equals(limited)){
+                    e.replace(0,e.length(),limited);
+                    input.setSelection(e.length());
+                }
+                int words=countWords(e.toString());
                 count.setText(words+"/15 words");
-                count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+                count.setTextColor(words>=15?Color.rgb(255,110,110):muted);
                 count.invalidate();
+                fixing=false;
             }
-            public void afterTextChanged(android.text.Editable e){}
         });
 
         AlertDialog nameDialog=new AlertDialog.Builder(this)
@@ -707,24 +717,29 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Could not save that file");}
     }
 
-    private android.text.InputFilter maxWordsFilter(){
-        return (source,start,end,dest,dstart,dend)->{
-            String candidate=dest.subSequence(0,dstart).toString()
-                +source.subSequence(start,end).toString()
-                +dest.subSequence(dend,dest.length()).toString();
-            return countWords(candidate)>15 ? "" : null;
-        };
+    private String limitTo15Words(String text){
+        if(text==null)return "";
+        String value=text.trim();
+        if(value.isEmpty())return "";
+        String[] words=value.split("\\s+");
+        if(words.length<=15)return value;
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<15;i++){
+            if(i>0)out.append(' ');
+            out.append(words[i]);
+        }
+        return out.toString();
     }
 
     private boolean validateMediaNote(EditText input, TextView count){
-        String note=input.getText().toString().trim();
-        int words=countWords(note);
-        count.post(()->count.setText(words+"/15 words"));
-        count.setTextColor(words>15?Color.rgb(255,110,110):muted);
-        if(words>15){
-            input.setError("Use 15 words or fewer");
-            return false;
+        String note=limitTo15Words(input.getText().toString());
+        if(!note.equals(input.getText().toString())){
+            input.setText(note);
+            input.setSelection(input.length());
         }
+        int words=countWords(note);
+        count.setText(words+"/15 words");
+        count.setTextColor(words>=15?Color.rgb(255,110,110):muted);
         if(words==0){
             input.setError("Please add a note");
             return false;
@@ -749,13 +764,24 @@ public class MainActivity extends Activity {
         box.addView(count,new LinearLayout.LayoutParams(-1,dp(32)));
 
         input.addTextChangedListener(new android.text.TextWatcher(){
+            private boolean fixing=false;
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int before,int countChanged){
-                int words=countWords(s.toString());
+            public void onTextChanged(CharSequence s,int st,int before,int countChanged){}
+            public void afterTextChanged(android.text.Editable e){
+                if(fixing)return;
+                fixing=true;
+                String value=e.toString();
+                String limited=limitTo15Words(value);
+                if(!value.equals(limited)){
+                    e.replace(0,e.length(),limited);
+                    input.setSelection(e.length());
+                }
+                int words=countWords(e.toString());
                 count.setText(words+"/15 words");
-                count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+                count.setTextColor(words>=15?Color.rgb(255,110,110):muted);
+                count.invalidate();
+                fixing=false;
             }
-            public void afterTextChanged(android.text.Editable e){}
         });
 
         AlertDialog dialog=new AlertDialog.Builder(this)
