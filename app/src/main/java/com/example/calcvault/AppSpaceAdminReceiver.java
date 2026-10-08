@@ -8,8 +8,7 @@ import android.content.Intent;
 import android.os.Bundle;
 
 public class AppSpaceAdminReceiver extends DeviceAdminReceiver {
-    @Override
-    public void onProfileProvisioningComplete(Context context, Intent intent) {
+    private void configureProfile(Context context, Intent intent) {
         DevicePolicyManager dpm=(DevicePolicyManager)context.getSystemService(Context.DEVICE_POLICY_SERVICE);
         ComponentName admin=new ComponentName(context,AppSpaceAdminReceiver.class);
 
@@ -30,5 +29,16 @@ public class AppSpaceAdminReceiver extends DeviceAdminReceiver {
         try{
             dpm.setApplicationHidden(admin,context.getPackageName(),true);
         }catch(Exception ignored){}
+    }
+
+    @Override
+    public void onProfileProvisioningComplete(Context context, Intent intent) {
+        configureProfile(context,intent);
+    }
+
+    @Override
+    public void onEnabled(Context context, Intent intent) {
+        super.onEnabled(context,intent);
+        configureProfile(context,intent);
     }
 }
