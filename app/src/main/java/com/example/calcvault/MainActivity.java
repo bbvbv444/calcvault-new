@@ -338,18 +338,77 @@ public class MainActivity extends Activity {
     }
 
     private void prepareCopiedAppForOpening(ApkCloneStore.CloneRecord record){
-        toast("Preparing private copy…");
-        new Thread(()->{
-            try{
-                CloneRuntime.PreparedRuntime runtime=new CloneRuntime(this).prepare(record);
-                runOnUiThread(()->new AlertDialog.Builder(this)
-                    .setTitle("Private copy ready")
-                    .setMessage(record.label+" is prepared in CalcVault's private runtime. Full launch/hiding of an arbitrary APK requires Android-level virtualization; CalcVault will not pretend the original app is installed as the copy.")
-                    .setPositiveButton("OK",null).show());
-            }catch(Exception e){
-                runOnUiThread(()->toast("Private copy could not be prepared"));
+        if(record==null||record.packageName==null||record.packageName.trim().isEmpty()){
+            toast("This private copy is missing its package name");
+            return;
+        }
+
+        UserHandle profile=findPrivateProfile();
+        if(profile!=null){
+            launchCopiedAppInProfile(record.packageName,profile);
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("Set up Private Apps")
+            .setMessage("CalcVault will create a separate Android private profile for copied apps. Android will show its own setup and permission screens. Your original app stays in the normal profile.")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Continue",(d,w)->provisionPrivateProfile(record.packageName))
+            .show();
+    }
+
+    private void provisionPrivateProfile(String packageName){
+        if(Build.VERSION.SDK_INT<21){
+            toast("Android private profiles are not supported on this device");
+            return;
+        }
+
+        DevicePolicyManager dpm=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
+        if(dpm!=null&&!dpm.isProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE)){
+            toast("Android does not allow a new private profile on this device");
+            return;
+        }
+
+        try{
+            ComponentName admin=new ComponentName(this,AppSpaceAdminReceiver.class);
+            Intent intent=new Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE);
+            intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,admin);
+
+            Bundle extras=new Bundle();
+            extras.putString("calcvault_clone_package",packageName);
+            intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE,extras);
+
+            if(Build.VERSION.SDK_INT>=24){
+                intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_SKIP_ENCRYPTION,true);
             }
-        }).start();
+
+            startActivityForResult(intent,914);
+        }catch(Exception e){
+            toast("Android could not start the private profile setup");
+        }
+    }
+
+    private void launchCopiedAppInProfile(String packageName,UserHandle profile){
+        try{
+            android.content.pm.LauncherApps launcher=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            if(launcher==null){toast("Android private app launcher is unavailable");return;}
+
+            List<android.content.pm.LauncherActivityInfo> activities=launcher.getActivityList(packageName,profile);
+            if(activities==null||activities.isEmpty()){
+                toast("The private copy is not installed in the private profile yet");
+                return;
+            }
+
+            android.content.pm.LauncherActivityInfo info=activities.get(0);
+            launcher.startMainActivity(
+                info.getComponentName(),
+                profile,
+                null,
+                null
+            );
+        }catch(Exception e){
+            toast("Could not open the private copy");
+        }
     }
 
     private void uninstallOriginal(String pkg,String name){
