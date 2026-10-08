@@ -255,8 +255,120 @@ public class MainActivity extends Activity {
 
     private void renderItems(LinearLayout v,String query){
         v.removeAllViews();String q=query==null?"":query.trim().toLowerCase(Locale.US);
+        addCopiedAppsSection(v,q);
         addSection(v,"Favorites",new ArrayList<>(),q,false,true);
         addSection(v,"Notes",notes,q,false,false);addSection(v,"Links",links,q,false,false);addSection(v,"Private Contacts",contacts,q,false,false);addSection(v,"Files / Media",files,q,true,false);
+    }
+
+    private void addCopiedAppsSection(LinearLayout v,String query){
+        UserHandle profile=findPrivateProfile();
+        TextView h=label("Copied Apps",18,fg,true);
+        h.setPadding(0,dp(16),0,dp(6));
+        v.addView(h);
+
+        if(profile==null){
+            v.addView(label("No private app space yet.",14,muted,false));
+            return;
+        }
+
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            PackageManager pm=getPackageManager();
+            List<android.content.pm.LauncherActivityInfo> activities=la.getActivityList(null,profile);
+            HashSet<String> seen=new HashSet<>();
+            int shown=0;
+
+            for(android.content.pm.LauncherActivityInfo info:activities){
+                String pkg=info.getApplicationInfo().packageName;
+                if(pkg.equals(getPackageName())||!seen.add(pkg))continue;
+
+                String name=String.valueOf(info.getLabel());
+                if(name==null||name.equals("null")||name.trim().isEmpty())name=pkg;
+                if(!query.isEmpty()&&!name.toLowerCase(Locale.US).contains(query)&&!pkg.toLowerCase(Locale.US).contains(query))continue;
+
+                shown++;
+                LinearLayout row=new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(8),dp(6),dp(4),dp(6));
+                row.setBackgroundColor(panel);
+
+                ImageView icon=new ImageView(this);
+                try{icon.setImageDrawable(info.getBadgedIcon(0));}catch(Exception ignored){}
+                row.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
+
+                LinearLayout textBox=new LinearLayout(this);
+                textBox.setOrientation(LinearLayout.VERTICAL);
+                textBox.addView(label(name,15,fg,true));
+                textBox.addView(label(pkg,10,muted,false));
+                row.addView(textBox,new LinearLayout.LayoutParams(0,dp(58),1));
+
+                Button open=button("Open Copy");
+                open.setTextSize(11);
+                open.setOnClickListener(x->launchPrivateCopy(pkg,profile));
+                row.addView(open,new LinearLayout.LayoutParams(dp(82),dp(42)));
+
+                Button del=button("Delete Copy");
+                del.setTextSize(10);
+                del.setOnClickListener(x->confirmDeleteCopiedApp(pkg,name,profile));
+                row.addView(del,new LinearLayout.LayoutParams(dp(82),dp(42)));
+
+                Button original=button("Uninstall Original");
+                original.setTextSize(9);
+                original.setOnClickListener(x->uninstallOriginal(pkg,name));
+                row.addView(original,new LinearLayout.LayoutParams(dp(100),dp(42)));
+
+                v.addView(row,new LinearLayout.LayoutParams(-1,-2));
+                Space gap=new Space(this);
+                v.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
+            }
+
+            if(shown==0)v.addView(label("No copied apps yet.",14,muted,false));
+        }catch(Exception e){
+            v.addView(label("No copied apps yet.",14,muted,false));
+        }
+    }
+
+    private void confirmDeleteCopiedApp(String pkg,String name,UserHandle profile){
+        new AlertDialog.Builder(this)
+            .setTitle("Delete private copy?")
+            .setMessage("Only the private copy of "+name+" will be removed. The original app will stay installed.")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Delete Copy",(d,w)->deleteCopiedApp(pkg,profile))
+            .show();
+    }
+
+    private void deleteCopiedApp(String pkg,UserHandle profile){
+        try{
+            if(Build.VERSION.SDK_INT<28){
+                toast("Android does not support this private-copy action on this version");
+                return;
+            }
+            Intent i=new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
+            i.setData(Uri.parse("package:"+pkg));
+            i.putExtra(Intent.EXTRA_USER,profile);
+            i.putExtra(Intent.EXTRA_RETURN_RESULT,true);
+            startActivityForResult(i,912);
+        }catch(Exception e){
+            toast("Android could not open the private-copy removal screen");
+        }
+    }
+
+    private void uninstallOriginal(String pkg,String name){
+        if(pkg.equals(getPackageName())){toast("CalcVault cannot uninstall itself here");return;}
+        new AlertDialog.Builder(this)
+            .setTitle("Uninstall original?")
+            .setMessage("Android will show its normal uninstall confirmation for "+name+".")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Continue",(d,w)->{
+                try{
+                    Intent i=new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
+                    i.setData(Uri.parse("package:"+pkg));
+                    i.putExtra(Intent.EXTRA_RETURN_RESULT,true);
+                    startActivityForResult(i,913);
+                }catch(Exception e){
+                    toast("Android could not open the uninstall screen");
+                }
+            }).show();
     }
 
     private void addSection(LinearLayout v,String title,ArrayList<String> list,String query,boolean fileSection,boolean favoriteOnly){
