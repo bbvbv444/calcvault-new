@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
+        applySelectedTheme();
         loadLists();
         buildHome();
         if(hasKey()) handleIncomingShare(getIntent());
@@ -1083,10 +1084,32 @@ public class MainActivity extends Activity {
     private void history(){new AlertDialog.Builder(this).setTitle("History").setMessage("Recent calculator results appear on the calculator display. Full persistent history will be added with the next data layer.").setPositiveButton("OK",null).show();}
 
     private void settingsDialog(){
-        String[] a={"Promo code","Backup data","Import data","Delete all data"};
+        String[] a={"Promo code","Backup data","Import data","Delete all data","Theme"};
         new AlertDialog.Builder(this).setTitle("Settings").setItems(a,(d,w)->{
-            if(w==0)promo();else if(w==1)backup();else if(w==2){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_BACKUP);}else deleteAll();
+            if(w==0)promo();else if(w==1)backup();else if(w==2){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_BACKUP);}else if(w==3)deleteAll();else themeDialog();
         }).show();
+    }
+
+    private void applySelectedTheme(){
+        boolean dark=prefs.getString("theme_mode","dark").equals("dark");
+        setTheme(dark?R.style.Theme_App:R.style.Theme_App_Light);
+        if(dark){
+            bg=Color.rgb(24,29,38);panel=Color.rgb(43,51,65);fg=Color.WHITE;muted=Color.rgb(195,201,212);accent=Color.rgb(100,165,255);
+        }else{
+            bg=Color.rgb(247,249,252);panel=Color.rgb(232,236,243);fg=Color.rgb(25,31,40);muted=Color.rgb(85,94,108);accent=Color.rgb(45,110,210);
+        }
+    }
+
+    private void themeDialog(){
+        String currentTheme=prefs.getString("theme_mode","dark");
+        String[] choices={"Dark","Light"};
+        int checked=currentTheme.equals("light")?1:0;
+        new AlertDialog.Builder(this).setTitle("Theme").setSingleChoiceItems(choices,checked,(d,w)->{
+            String selected=w==1?"light":"dark";
+            prefs.edit().putString("theme_mode",selected).apply();
+            d.dismiss();
+            recreate();
+        }).setNegativeButton("Cancel",null).show();
     }
 
     private void promo(){
