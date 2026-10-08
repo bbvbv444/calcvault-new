@@ -619,6 +619,11 @@ public class MainActivity extends Activity {
         if(r==PICK_FILE&&c==RESULT_OK&&data!=null&&data.getData()!=null)savePrivateFile(data.getData());
         else if(r==PICK_SCAN&&c==RESULT_OK&&data!=null&&data.getExtras()!=null){android.graphics.Bitmap bmp=(android.graphics.Bitmap)data.getExtras().get("data");if(bmp!=null)saveScannedPdf(bmp);}
         else if(r==PICK_BACKUP&&c==RESULT_OK&&data!=null&&data.getData()!=null)importBackup(data.getData());
+        else if(r==910){
+            if(c==RESULT_OK)toast("Private App Space setup completed");
+            else toast("Private App Space setup was canceled or not available");
+            refreshPrivateAppsAfterProvisioning();
+        }
         else if(r==DELETE_REQUEST){
             if(c==RESULT_OK){
                 toast("Original removed from Gallery");
