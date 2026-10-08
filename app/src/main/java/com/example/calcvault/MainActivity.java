@@ -1,9 +1,7 @@
 package com.example.calcvault;
 
 import android.app.*;
-import android.app.admin.DevicePolicyManager;
 import android.content.*;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -619,11 +617,6 @@ public class MainActivity extends Activity {
         if(r==PICK_FILE&&c==RESULT_OK&&data!=null&&data.getData()!=null)savePrivateFile(data.getData());
         else if(r==PICK_SCAN&&c==RESULT_OK&&data!=null&&data.getExtras()!=null){android.graphics.Bitmap bmp=(android.graphics.Bitmap)data.getExtras().get("data");if(bmp!=null)saveScannedPdf(bmp);}
         else if(r==PICK_BACKUP&&c==RESULT_OK&&data!=null&&data.getData()!=null)importBackup(data.getData());
-        else if(r==910){
-            if(c==RESULT_OK)toast("Private App Space setup completed");
-            else toast("Private App Space setup was canceled or not available");
-            if(unlocked)new Handler().postDelayed(this::appHider,300);
-        }
         else if(r==DELETE_REQUEST){
             if(c==RESULT_OK){
                 toast("Original removed from Gallery");
@@ -1017,108 +1010,25 @@ public class MainActivity extends Activity {
         Button back=button("Back to Vault");
         back.setOnClickListener(v->vault());
         box.addView(back,new LinearLayout.LayoutParams(-1,dp(48)));
+        TextView info=label("Android-supported controls only. CalcVault can hide its own launcher icon. Other apps cannot be hidden by a normal app.",14,muted,false);
+        info.setPadding(dp(4),dp(4),dp(4),dp(12));
+        box.addView(info);
+        LinearLayout self=new LinearLayout(this);self.setOrientation(LinearLayout.VERTICAL);self.setPadding(dp(10),dp(10),dp(10),dp(10));self.setBackgroundColor(panel);
+        self.addView(label("CalcVault",17,fg,true));
+        int launcherState=getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"));\n        boolean hidden=launcherState==PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+        Button selfButton=button(hidden?"Restore CalcVault launcher icon":"Hide CalcVault launcher icon");
+        self.addView(label(hidden?"The launcher icon is currently hidden. Tap the recovery notification to reopen CalcVault.":"This removes only the launcher icon. CalcVault itself remains installed and usable.",13,muted,false));
+        self.addView(selfButton,new LinearLayout.LayoutParams(-1,dp(48)));
+        selfButton.setOnClickListener(v->{ if(hidden)showCalcVaultLauncher(); else requestHideCalcVaultLauncher(); });
+        box.addView(self,new LinearLayout.LayoutParams(-1,-2));
 
-        box.addView(label("Private App Space",18,fg,true));
-        box.addView(label("Create an Android-managed private profile for apps you choose. Android shows the consent screens before setup.",14,muted,false));
-
-        Button setup=button(privateProfileReady()?"Private App Space is ready":"Set up Private App Space");
-        setup.setOnClickListener(v->setupPrivateAppSpace());
-        box.addView(setup,new LinearLayout.LayoutParams(-1,dp(52)));
-
-        if(privateProfileReady()){
-            Button manage=button("Manage Private Apps");
-            manage.setOnClickListener(v->managePrivateProfile());
-            box.addView(manage,new LinearLayout.LayoutParams(-1,dp(52)));
-            box.addView(label("This uses Android's managed-profile system. App installation/cloning is controlled by Android and your device.",13,muted,false));
-        }else{
-            box.addView(label("If your phone does not support managed profiles, CalcVault will leave your existing apps unchanged.",13,muted,false));
-        }
-
-        box.addView(label("CalcVault launcher",18,fg,true));
-        int launcherState=getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"));
-        boolean hidden=launcherState==PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-        Button self=button(hidden?"Restore CalcVault launcher icon":"Hide CalcVault launcher icon");
-        self.setOnClickListener(v->{if(hidden)showCalcVaultLauncher();else requestHideCalcVaultLauncher();});
-        box.addView(self,new LinearLayout.LayoutParams(-1,dp(52)));
-        box.addView(label("If you hide CalcVault, recover it from Android Settings → Apps → CalcVault → Open, then unlock the vault and restore the launcher icon.",13,muted,false));
-
-        box.addView(label("Installed apps",18,fg,true));
-        EditText search=new EditText(this);search.setHint("Search apps");search.setSingleLine(true);
-        box.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
-        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);
-        ScrollView scroll=new ScrollView(this);scroll.addView(list,new ScrollView.LayoutParams(-1,-2));
-        box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        search.addTextChangedListener(new android.text.TextWatcher(){
-            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int b,int c){renderInstalledApps(list,s.toString());}
-            public void afterTextChanged(android.text.Editable e){}
-        });
-        renderInstalledApps(list,"");
+        TextView appsTitle=label("Installed apps",18,fg,true);appsTitle.setPadding(0,dp(18),0,dp(6));box.addView(appsTitle);
+        EditText search=new EditText(this);search.setHint("Search apps");search.setSingleLine(true);box.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
+        ScrollView scroll=new ScrollView(this);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list,new ScrollView.LayoutParams(-1,-2));box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        Runnable render=()->renderInstalledApps(list,search.getText().toString());
+        search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){render.run();}public void afterTextChanged(android.text.Editable e){}});
+        render.run();
         setContentView(box);
-    }
-
-    private DevicePolicyManager appSpaceDpm(){
-        return (DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
-    }
-
-    private ComponentName appSpaceAdmin(){
-        return new ComponentName(this,AppSpaceAdminReceiver.class);
-    }
-
-    private boolean privateProfileReady(){
-        try{
-            return appSpaceDpm().isProfileOwnerApp(getPackageName());
-        }catch(Exception e){
-            return false;
-        }
-    }
-
-    private void setupPrivateAppSpace(){
-        if(privateProfileReady()){
-            toast("Private App Space is already ready");
-            appHider();
-            return;
-        }
-        DevicePolicyManager dpm=appSpaceDpm();
-        try{
-            if(Build.VERSION.SDK_INT<21){
-                toast("This Android version does not support Private App Space");
-                return;
-            }
-            if(!dpm.isProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE)){
-                new AlertDialog.Builder(this)
-                    .setTitle("Private App Space unavailable")
-                    .setMessage("Android is not allowing a managed profile to be created on this phone right now. Your existing CalcVault data and apps are unchanged.")
-                    .setPositiveButton("OK",null).show();
-                return;
-            }
-            Intent i=new Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE);
-            i.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,appSpaceAdmin());
-            startActivityForResult(i,910);
-        }catch(Exception e){
-            new AlertDialog.Builder(this)
-                .setTitle("Setup could not start")
-                .setMessage("Android could not start the private app profile on this device. Nothing was changed.")
-                .setPositiveButton("OK",null).show();
-        }
-    }
-
-    private void managePrivateProfile(){
-        if(!privateProfileReady()){
-            setupPrivateAppSpace();
-            return;
-        }
-        new AlertDialog.Builder(this)
-            .setTitle("Private App Space")
-            .setMessage("Android has created the managed profile for CalcVault. The profile is separate from your normal space. Apps must be installed into the managed profile by Android before CalcVault can manage them there.")
-            .setPositiveButton("Open profile settings", (d,w)->{
-                try{
-                    Intent i=new Intent(android.provider.Settings.ACTION_SETTINGS);
-                    startActivity(i);
-                }catch(Exception e){toast("Android did not provide profile settings");}
-            })
-            .setNegativeButton("Back",null)
-            .show();
     }
 
     private void renderInstalledApps(LinearLayout list,String query){
