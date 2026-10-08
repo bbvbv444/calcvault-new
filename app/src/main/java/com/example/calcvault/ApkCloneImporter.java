@@ -15,7 +15,7 @@ public final class ApkCloneImporter {
         this.store = new ApkCloneStore(this.context);
     }
 
-    public CloneRecord importInstalledPackage(String packageName) throws IOException {
+    public ApkCloneStore.CloneRecord importInstalledPackage(String packageName) throws IOException {
         try {
             PackageManager pm = context.getPackageManager();
             ApplicationInfo info = pm.getApplicationInfo(packageName, 0);
