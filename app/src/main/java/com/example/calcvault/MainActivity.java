@@ -352,6 +352,24 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private void uninstallOriginal(String pkg,String name){
+        if(pkg.equals(getPackageName())){toast("CalcVault cannot uninstall itself here");return;}
+        new AlertDialog.Builder(this)
+            .setTitle("Uninstall original?")
+            .setMessage("Android will show its normal uninstall confirmation for "+name+".")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Continue",(d,w)->{
+                try{
+                    Intent i=new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
+                    i.setData(Uri.parse("package:"+pkg));
+                    i.putExtra(Intent.EXTRA_RETURN_RESULT,true);
+                    startActivityForResult(i,913);
+                }catch(Exception e){
+                    toast("Android could not open the uninstall screen");
+                }
+            }).show();
+    }
+
     private void addSection(LinearLayout v,String title,ArrayList<String> list,String query,boolean fileSection,boolean favoriteOnly){
         TextView h=label(title,18,fg,true);h.setPadding(0,dp(16),0,dp(6));v.addView(h);
         if(favoriteOnly){
