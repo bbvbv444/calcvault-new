@@ -95,13 +95,18 @@ public final class CloneRuntime {
             throw new IOException("Clone classes could not be loaded: "+e.getClass().getSimpleName(),e);
         }
 
-        String metadata="{\n"
-                +"  \\"packageName\\": \\""+escape(clone.packageName)+"\\",\\n"
-                +"  \\"label\\": \\""+escape(clone.label)+"\\",\\n"
-                +"  \\"launchActivity\\": \\""+escape(launchActivity)+"\\",\\n"
-                +"  \\"applicationClass\\": \\""+escape(applicationClass)+"\\",\\n"
-                +"  \\"preparedAt\\": "+System.currentTimeMillis()+"\\n"
-                +"}\n";
+        String metadata;
+        try{
+            org.json.JSONObject meta=new org.json.JSONObject();
+            meta.put("packageName",clone.packageName);
+            meta.put("label",clone.label);
+            meta.put("launchActivity",launchActivity);
+            meta.put("applicationClass",applicationClass);
+            meta.put("preparedAt",System.currentTimeMillis());
+            metadata=meta.toString();
+        }catch(Exception e){
+            throw new IOException("Could not create runtime metadata",e);
+        }
 
         write(new File(root,"runtime.json"),metadata);
         write(new File(root,"READY"),"prepared\n");
