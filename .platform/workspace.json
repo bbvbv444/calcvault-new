@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "name": "calcvault-new",
+      "path": "."
+    }
+  ]
+}
