@@ -115,8 +115,30 @@ public class MainActivity extends Activity {
 
     private void calcKey(String k){
         if("C".equals(k)){current="";operator="";stored=0;fresh=true;expression="";show("0");return;}
-        if("⌫".equals(k)){if(!current.isEmpty()){current=current.substring(0,current.length()-1);if(!expression.isEmpty()&&!"+−×÷".contains(String.valueOf(expression.charAt(expression.length()-1))))expression=expression.substring(0,expression.length()-1);}else if(!expression.isEmpty()&&"+−×÷".indexOf(expression.charAt(expression.length()-1))>=0){expression=expression.substring(0,expression.length()-1);operator="";}show(expression.isEmpty()?"0":expression);return;}
-        if("%".equals(k)){try{current=fmt(Double.parseDouble(current.isEmpty()?"0":current)/100);show(expression.isEmpty()?current:expression+"\n"+current);}catch(Exception ignored){}return;}
+        if("⌫".equals(k)){
+            if(fresh){
+                // After a completed calculation, backspace starts a fresh entry.
+                current="";operator="";expression="";fresh=true;show("0");return;
+            }
+            if(!expression.isEmpty()){
+                expression=expression.substring(0,expression.length()-1);
+                syncCurrentFromExpression();
+                if(!expression.isEmpty() && " +−×÷".indexOf(expression.charAt(expression.length()-1))>=0)operator=String.valueOf(expression.charAt(expression.length()-1));
+                else operator="";
+                show(expression.isEmpty()?"0":expression);
+            }
+            return;
+        }
+        if("%".equals(k)){
+            try{
+                current=fmt(Double.parseDouble(current.isEmpty()?"0":current)/100);
+                expression=current;
+                operator="";
+                fresh=false;
+                show(expression);
+            }catch(Exception ignored){}
+            return;
+        }
         if("=".equals(k)){
             if(hasKey() && operator.isEmpty() && !current.isEmpty() && get(KEY_HASH).equals(hash(current))){
                 unlocked=true;unlockAt=System.currentTimeMillis();current="";expression="";show("0");vault();return;
@@ -124,15 +146,29 @@ public class MainActivity extends Activity {
             calculate();return;
         }
         if(Arrays.asList("+","−","×","÷").contains(k)){
-            if(current.isEmpty()&&!expression.isEmpty()&&"+−×÷".indexOf(expression.charAt(expression.length()-1))>=0)expression=expression.substring(0,expression.length()-1);
-            if(!current.isEmpty()){current="";}
-            expression+=k;operator=k;fresh=false;show(expression);return;
+            if(current.isEmpty() && !expression.isEmpty() && " +−×÷".indexOf(expression.charAt(expression.length()-1))>=0){
+                expression=expression.substring(0,expression.length()-1);
+            }
+            expression=expression.replaceAll("[+−×÷]$","")+k;
+            current="";
+            operator=k;
+            fresh=false;
+            show(expression);
+            return;
         }
-        if(".".equals(k)&&current.contains("."))return;
+        if(".".equals(k) && current.contains("."))return;
         if(fresh){current="";expression="";operator="";fresh=false;}
         current+=k;
         expression+=k;
         show(expression);
+    }
+
+    private void syncCurrentFromExpression(){
+        current="";
+        if(expression.isEmpty())return;
+        int i=expression.length()-1;
+        while(i>=0 && (Character.isDigit(expression.charAt(i))||expression.charAt(i)=='.'))i--;
+        current=expression.substring(i+1);
     }
 
     private void calculate(){
@@ -228,20 +264,17 @@ public class MainActivity extends Activity {
             String type=title.equals("Notes")?"note":title.equals("Links")?"link":title.equals("Private Contacts")?"contact":"file";
             Button star=button(isFavorite(type,s)?"★":"☆");star.setTextSize(18);star.setOnClickListener(x->{toggleFavorite(type,s);renderItems(v,query);});row.addView(star,new LinearLayout.LayoutParams(dp(48),dp(44)));
             if(fileSection){
-                try{JSONObject m=new JSONObject(s);String mime=m.optString("mime","");if(mime.startsWith("image/")||mime.startsWith("video/")){Button restore=button("Restore");restore.setTextSize(12);restore.setOnClickListener(x->restorePrivateMedia(s));row.addView(restore,new LinearLayout.LayoutParams(dp(82),dp(44)));}}catch(Exception ignored){}
-            }
-            if(fileSection){
                 try{
                     JSONObject m=new JSONObject(s);String mime=m.optString("mime","");
                     if(mime.startsWith("image/")||mime.startsWith("video/")){
                         Button restore=button("Restore");restore.setTextSize(12);
                         restore.setOnClickListener(x->restorePrivateMedia(s));
-                        row.addView(restore,new LinearLayout.LayoutParams(dp(82),dp(44)));
+                        row.addView(restore,new LinearLayout.LayoutParams(dp(76),dp(44)));
                     }
                 }catch(Exception ignored){}
                 Button del=button("Delete");del.setTextSize(12);
                 del.setOnClickListener(x->confirmDeleteVaultItem(title,s,v,query));
-                row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));
+                row.addView(del,new LinearLayout.LayoutParams(dp(68),dp(44)));
             }
             if(title.equals("Private Contacts")){
                 Button del=button("Delete");del.setTextSize(12);
@@ -330,24 +363,77 @@ public class MainActivity extends Activity {
                 .show();
             return;
         }
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8),dp(8),dp(8),dp(8));
         TextView status=label("Ready to record",16,fg,true);
+
+        LinearLayout meter=new LinearLayout(this);
+        meter.setOrientation(LinearLayout.HORIZONTAL);
+        meter.setGravity(Gravity.CENTER_VERTICAL);
+        meter.setPadding(dp(4),dp(12),dp(4),dp(12));
+        ArrayList<View> bars=new ArrayList<>();
+        for(int i=0;i<28;i++){
+            TextView bar=new TextView(this);
+            bar.setBackgroundColor(accent);
+            LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(dp(5),dp(6));
+            bp.setMargins(dp(2),0,dp(2),0);
+            meter.addView(bar,bp);
+            bars.add(bar);
+        }
+
         Button start=button("Start recording");
         Button stop=button("Stop and save");
         stop.setEnabled(false);
-        box.addView(status);box.addView(start);box.addView(stop);
+        box.addView(status,new LinearLayout.LayoutParams(-1,dp(42)));
+        box.addView(meter,new LinearLayout.LayoutParams(-1,dp(70)));
+        box.addView(start,new LinearLayout.LayoutParams(-1,dp(48)));
+        box.addView(stop,new LinearLayout.LayoutParams(-1,dp(48)));
+
         final boolean[] recording={false};
+        final Handler meterHandler=new Handler(Looper.getMainLooper());
+        final Runnable meterRunnable=new Runnable(){
+            @Override public void run(){
+                if(!recording[0]||recorder==null)return;
+                int amp=0;
+                try{amp=recorder.getMaxAmplitude();}catch(Exception ignored){}
+                float level=Math.min(1f,amp/32767f);
+                if(level<0.06f)level=0.06f;
+                for(int i=0;i<bars.size();i++){
+                    double wave=(Math.sin(i*0.75+System.currentTimeMillis()/140.0)+1.0)/2.0;
+                    int h=6+Math.round(dp(42)*(0.25f+0.75f*level*(float)wave));
+                    bars.get(i).getLayoutParams().height=h;
+                    bars.get(i).requestLayout();
+                }
+                meterHandler.postDelayed(this,100);
+            }
+        };
+
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Private Audio Recorder").setView(box)
             .setNegativeButton("Close",(which,w)->{
+                recording[0]=false;
+                meterHandler.removeCallbacks(meterRunnable);
                 if(recorder!=null){
-                    try{if(recording[0])recorder.stop();}catch(Exception ignored){}
+                    try{recorder.stop();}catch(Exception ignored){}
                     try{recorder.release();}catch(Exception ignored){}
                     recorder=null;
                 }
                 if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
-                recordingFile=null;recording[0]=false;
+                recordingFile=null;
             }).create();
+
+        dialog.setOnDismissListener(d->{
+            recording[0]=false;
+            meterHandler.removeCallbacks(meterRunnable);
+            if(recorder!=null){
+                try{recorder.release();}catch(Exception ignored){}
+                recorder=null;
+            }
+            recordingFile=null;
+        });
         dialog.show();
+
         start.setOnClickListener(v->{
             if(recording[0])return;
             try{
@@ -355,33 +441,58 @@ public class MainActivity extends Activity {
                 if(!dir.exists()&&!dir.mkdirs())throw new IOException("folder");
                 File nm=new File(dir,nextHumanFileName("Private Voice Recording",".m4a"));
                 recordingFile=nm;
-                android.media.MediaRecorder r=new android.media.MediaRecorder();recorder=r;
+
+                android.media.MediaRecorder r=new android.media.MediaRecorder();
+                recorder=r;
                 r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);
                 r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);
                 r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);
-                r.setAudioSamplingRate(44100);
-                r.setAudioEncodingBitRate(128000);
-                r.setOutputFile(nm.getAbsolutePath());r.prepare();r.start();
-                recording[0]=true;status.setText("Recording…");start.setEnabled(false);stop.setEnabled(true);
+                r.setOutputFile(nm.getAbsolutePath());
+                r.prepare();
+                r.start();
+
+                recording[0]=true;
+                status.setText("Recording… speak now");
+                start.setEnabled(false);
+                stop.setEnabled(true);
+                meterHandler.post(meterRunnable);
             }catch(Exception e){
                 if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
                 if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
-                recordingFile=null;recording[0]=false;toast("Could not start recording");
+                recordingFile=null;
+                recording[0]=false;
+                status.setText("Could not start recording");
+                toast("Could not start recording");
             }
         });
+
         stop.setOnClickListener(v->{
             if(!recording[0]||recorder==null)return;
             try{
-                recorder.stop();recorder.release();recorder=null;recording[0]=false;
+                recording[0]=false;
+                meterHandler.removeCallbacks(meterRunnable);
+                recorder.stop();
+                recorder.release();
+                recorder=null;
                 if(recordingFile!=null&&recordingFile.exists()&&recordingFile.length()>0){
-                    JSONObject m=new JSONObject();m.put("name",recordingFile.getName());m.put("mime","audio/mp4");m.put("path",recordingFile.getAbsolutePath());
-                    files.add(m.toString());saveLists();toast("Private voice recording saved");
+                    JSONObject m=new JSONObject();
+                    m.put("name",recordingFile.getName());
+                    m.put("mime","audio/mp4");
+                    m.put("path",recordingFile.getAbsolutePath());
+                    files.add(m.toString());
+                    saveLists();
+                    toast("Private voice recording saved");
                 }else throw new IOException("empty recording");
-                recordingFile=null;dialog.dismiss();if(unlocked)vault();
+                recordingFile=null;
+                dialog.dismiss();
+                if(unlocked)vault();
             }catch(Exception e){
                 if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
                 if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
-                recordingFile=null;recording[0]=false;toast("Could not save recording");
+                recordingFile=null;
+                recording[0]=false;
+                meterHandler.removeCallbacks(meterRunnable);
+                toast("Could not save recording");
             }
         });
     }
@@ -918,9 +1029,16 @@ public class MainActivity extends Activity {
     private void show(String s){
         if(display==null||resultDisplay==null)return;
         int p=s.indexOf("\n");
-        if(p>=0){display.setText(s.substring(0,p)); resultDisplay.setText(s.substring(p+1));}
-        else {display.setText(""); resultDisplay.setText(s);}
-        display.post(()->{ if(display.getParent() instanceof HorizontalScrollView){ ((HorizontalScrollView)display.getParent()).fullScroll(HorizontalScrollView.FOCUS_RIGHT); } });
+        if(p>=0){display.setText(s.substring(0,p));resultDisplay.setText(s.substring(p+1));}
+        else{display.setText(s);resultDisplay.setText("");}
+        display.requestLayout();
+        display.post(()->{
+            ViewParent parent=display.getParent();
+            if(parent instanceof HorizontalScrollView){
+                HorizontalScrollView h=(HorizontalScrollView)parent;
+                h.post(()->h.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
+            }
+        });
     }
 
     private LinearLayout screen(String title){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);v.setPadding(dp(14),dp(14),dp(14),dp(14));v.setBackgroundColor(bg);v.addView(label(title,22,fg,true));return v;}
