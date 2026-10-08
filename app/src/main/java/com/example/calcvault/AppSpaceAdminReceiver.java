@@ -23,6 +23,17 @@ public class AppSpaceAdminReceiver extends DeviceAdminReceiver {
         if(pkg!=null&&!pkg.equals(context.getPackageName())&&android.os.Build.VERSION.SDK_INT>=28){
             try{
                 dpm.installExistingPackage(admin,pkg);
+                final String target=pkg;
+                new android.os.Handler(context.getMainLooper()).postDelayed(()->{
+                    try{
+                        android.content.pm.PackageManager pm=context.getPackageManager();
+                        Intent launch=pm.getLaunchIntentForPackage(target);
+                        if(launch!=null){
+                            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            context.startActivity(launch);
+                        }
+                    }catch(Exception ignored){}
+                },700);
             }catch(Exception ignored){}
         }
 
