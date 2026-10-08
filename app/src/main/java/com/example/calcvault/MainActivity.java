@@ -281,8 +281,9 @@ public class MainActivity extends Activity {
                 String pkg=info.getApplicationInfo().packageName;
                 if(pkg.equals(getPackageName())||!seen.add(pkg))continue;
 
-                String name=String.valueOf(info.getLabel());
-                if(name==null||name.equals("null")||name.trim().isEmpty())name=pkg;
+                String nameValue=String.valueOf(info.getLabel());
+                if(nameValue==null||nameValue.equals("null")||nameValue.trim().isEmpty())nameValue=pkg;
+                final String name=nameValue;
                 if(!query.isEmpty()&&!name.toLowerCase(Locale.US).contains(query)&&!pkg.toLowerCase(Locale.US).contains(query))continue;
 
                 shown++;
@@ -1170,6 +1171,16 @@ public class MainActivity extends Activity {
         });
         render.run();
         setContentView(box);
+    }
+
+    private UserHandle findPrivateProfile(){
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            for(UserHandle u:la.getProfiles()){
+                if(!UserHandle.myUserHandle().equals(u))return u;
+            }
+        }catch(Exception ignored){}
+        return null;
     }
 
     private void renderPrivateAppChoices(LinearLayout list,String query,UserHandle ignoredProfile){
