@@ -7,4 +7,9 @@
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_secondary">#C3C9D4</color>
     <color name="ic_launcher_background">#3DDC84</color>
+    <color name="primary_light">#2D6ED2</color>
+    <color name="app_background_light">#F7F9FC</color>
+    <color name="panel_background_light">#E8ECF3</color>
+    <color name="text_primary_light">#191F28</color>
+    <color name="text_secondary_light">#555E6C</color>
 </resources>
