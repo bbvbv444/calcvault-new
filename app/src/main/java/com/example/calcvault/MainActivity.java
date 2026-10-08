@@ -1077,29 +1077,49 @@ public class MainActivity extends Activity {
         list.removeAllViews();
         String q=query==null?"":query.trim().toLowerCase(Locale.US);
         PackageManager pm=getPackageManager();
-        Intent launcherIntent=new Intent(Intent.ACTION_MAIN,null);
-        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-        List<android.content.pm.ResolveInfo> apps=pm.queryIntentActivities(launcherIntent,PackageManager.MATCH_ALL);
-        Collections.sort(apps,(a,b)->String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm))));
-        int shown=0;
 
-        for(android.content.pm.ResolveInfo ri:apps){
-            String pkg=ri.activityInfo.packageName;
-            String name=String.valueOf(ri.loadLabel(pm));
-            if(pkg.equals(getPackageName()))continue;
+        // Use installed applications instead of launcher activities so apps without
+        // a normal launcher icon (including many system components) can appear.
+        List<android.content.pm.ApplicationInfo> apps;
+        try{
+            apps=pm.getInstalledApplications(PackageManager.MATCH_ALL);
+        }catch(Exception e){
+            apps=new ArrayList<>();
+        }
+
+        Collections.sort(apps,(a,b)->{
+            String an=String.valueOf(a.loadLabel(pm));
+            String bn=String.valueOf(b.loadLabel(pm));
+            return an.compareToIgnoreCase(bn);
+        });
+
+        int shown=0;
+        for(android.content.pm.ApplicationInfo info:apps){
+            String pkg=info.packageName;
+            if(pkg==null||pkg.equals(getPackageName()))continue;
+
+            String name=String.valueOf(info.loadLabel(pm));
+            if(name.trim().isEmpty())name=pkg;
+
             if(!q.isEmpty()&&!name.toLowerCase(Locale.US).contains(q)&&!pkg.toLowerCase(Locale.US).contains(q))continue;
 
             shown++;
+            boolean systemApp=(info.flags&android.content.pm.ApplicationInfo.FLAG_SYSTEM)!=0;
+            boolean updatedSystemApp=(info.flags&android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)!=0;
             boolean cloned=isAppClonedInProfile(pkg,profile);
+
             LinearLayout row=new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(dp(8),dp(8),dp(8),dp(8));
             row.setBackgroundColor(panel);
+
             row.addView(label(name,16,fg,true));
-            row.addView(label(pkg,11,muted,false));
+            String typeLabel=(systemApp||updatedSystemApp)?"System app":"Installed app";
+            row.addView(label(pkg+" • "+typeLabel,11,muted,false));
 
             LinearLayout actions=new LinearLayout(this);
             actions.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+
             if(cloned){
                 Button launch=button("Launch Private Copy");
                 launch.setOnClickListener(v->launchPrivateCopy(pkg,profile));
@@ -1114,12 +1134,14 @@ public class MainActivity extends Activity {
                 }
                 actions.addView(clone,new LinearLayout.LayoutParams(0,dp(44),1));
             }
+
             row.addView(actions);
             list.addView(row,new LinearLayout.LayoutParams(-1,-2));
             Space gap=new Space(this);
             list.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
         }
-        if(shown==0)list.addView(label("No matching launchable apps found.",14,muted,false));
+
+        if(shown==0)list.addView(label("No installed apps match your search.",14,muted,false));
     }
 
     private boolean isAppClonedInProfile(String pkg,UserHandle profile){
