@@ -327,9 +327,9 @@ public class MainActivity extends Activity {
     private boolean matches(String s,String q){return q.isEmpty()||s.toLowerCase(Locale.US).contains(q);}
 
     private void addItemDialog(){
-        String[] choices={"Note","Link","File / Image","Private contact","Record audio"};
+        String[] choices={"Note","Link","File / Image","Private contact","Record audio","Document Scanner"};
         new AlertDialog.Builder(this).setTitle("Add item").setItems(choices,(d,w)->{
-            if(w==0)addText(false);else if(w==1)addText(true);else if(w==2)pickFile();else if(w==3)addPrivateContact();else recordAudio();
+            if(w==0)addText(false);else if(w==1)addText(true);else if(w==2)pickFile();else if(w==3)addPrivateContact();else if(w==4)recordAudio();else scanDocument();
         }).show();
     }
 
@@ -624,6 +624,7 @@ public class MainActivity extends Activity {
         input.setTextColor(fg);
         input.setHintTextColor(muted);
         input.setSingleLine(true);
+        input.setFilters(new android.text.InputFilter[]{maxWordsFilter()});
         input.setPadding(dp(12),dp(8),dp(12),dp(8));
 
         LinearLayout box=new LinearLayout(this);
@@ -638,7 +639,7 @@ public class MainActivity extends Activity {
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
             public void onTextChanged(CharSequence s,int st,int before,int countChanged){
                 int words=countWords(s.toString());
-                count.setText(words+"/15 words");
+                count.post(()->count.setText(words+"/15 words"));
                 count.setTextColor(words>15?Color.rgb(255,110,110):muted);
             }
             public void afterTextChanged(android.text.Editable e){}
@@ -697,10 +698,19 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Could not save that file");}
     }
 
+    private android.text.InputFilter maxWordsFilter(){
+        return (source,start,end,dest,dstart,dend)->{
+            String candidate=dest.subSequence(0,dstart).toString()
+                +source.subSequence(start,end).toString()
+                +dest.subSequence(dend,dest.length()).toString();
+            return countWords(candidate)>15 ? "" : null;
+        };
+    }
+
     private boolean validateMediaNote(EditText input, TextView count){
         String note=input.getText().toString().trim();
         int words=countWords(note);
-        count.setText(words+"/15 words");
+        count.post(()->count.setText(words+"/15 words"));
         count.setTextColor(words>15?Color.rgb(255,110,110):muted);
         if(words>15){
             input.setError("Use 15 words or fewer");
