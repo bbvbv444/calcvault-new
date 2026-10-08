@@ -1057,10 +1057,20 @@ public class MainActivity extends Activity {
         try{
             android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
             for(UserHandle u:la.getProfiles()){
-                if(!UserHandle.myUserHandle().equals(u))return u;
+                if(!android.os.Process.myUserHandle().equals(u))return u;
             }
         }catch(Exception ignored){}
         return null;
+    }
+
+    private void hideCalcVaultLauncher(){
+        try{
+            ComponentName alias=new ComponentName(this,CalcVaultLauncher.class);
+            getPackageManager().setComponentEnabledSetting(alias,PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
+            toast("CalcVault launcher icon hidden");
+        }catch(Exception e){
+            toast("Could not hide the launcher icon");
+        }
     }
 
     private void renderPrivateAppChoices(LinearLayout list,String query,UserHandle profile){
