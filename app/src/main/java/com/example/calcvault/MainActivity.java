@@ -1034,7 +1034,7 @@ public class MainActivity extends Activity {
 
         box.addView(label("Private App Copies",18,fg,true));
         box.addView(label("Create a private APK copy inside CalcVault. No Android managed profile is used.",14,muted,false));
-        box.addView(label("The copy is stored privately first. The isolated runtime is the next engine stage.",13,muted,false));
+        box.addView(label("Private runtime preparation is enabled. The original app is not modified.",13,muted,false));
 
         TextView appsTitle=label("Installed apps",18,fg,true);
         appsTitle.setPadding(0,dp(18),0,dp(6));
@@ -1106,7 +1106,7 @@ public class MainActivity extends Activity {
                 if(cloned){
                     new AlertDialog.Builder(this)
                         .setTitle("Private copy")
-                        .setMessage("The APK copy is safely stored inside CalcVault. The isolated app runtime is not enabled yet, so the original app has not been hidden or changed.")
+                        .setMessage("The private APK copy and runtime preparation are ready. The original app has not been modified. Full in-app launch and hiding still require the next virtualization layer.")
                         .setPositiveButton("OK",null).show();
                     return;
                 }
