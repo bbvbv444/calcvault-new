@@ -61,6 +61,7 @@ public final class CloneRuntime {
                 +"  \"preparedAt\": "+System.currentTimeMillis()+"\n"
                 +"}\n";
         write(new File(root,"runtime.json"),metadata);
+        write(new File(root,"READY"),"prepared\\n");
 
         return new PreparedRuntime(clone,launchActivity,root);
     }
