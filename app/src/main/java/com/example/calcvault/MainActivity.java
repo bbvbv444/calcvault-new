@@ -233,9 +233,9 @@ public class MainActivity extends Activity {
     private void vault(){
         if(!unlocked)return;
         LinearLayout v=screen("Private Vault");
-        Button add=button("+ Add item"), lock=button("Lock");
-        add.setOnClickListener(x->addItemDialog());lock.setOnClickListener(x->{unlocked=false;buildHome();});
-        v.addView(add,new LinearLayout.LayoutParams(-1,dp(50)));v.addView(lock,new LinearLayout.LayoutParams(-1,dp(50)));
+        Button add=button("+ Add item"), lock=button("Lock"), hider=button("App Hider");
+        add.setOnClickListener(x->addItemDialog());lock.setOnClickListener(x->{unlocked=false;buildHome();});hider.setOnClickListener(x->appHider());
+        v.addView(add,new LinearLayout.LayoutParams(-1,dp(50)));v.addView(lock,new LinearLayout.LayoutParams(-1,dp(50)));v.addView(hider,new LinearLayout.LayoutParams(-1,dp(50)));
         v.addView(label("Search, favorites, contacts and private media",14,muted,false));
         EditText search=new EditText(this);search.setHint("Search vault");search.setSingleLine(true);v.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
         ScrollView scroll=new ScrollView(this);
@@ -1000,13 +1000,16 @@ public class MainActivity extends Activity {
 
 
     private void toolsDialog(){
-        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator","App Hider"};
+        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator"};
         new AlertDialog.Builder(this).setTitle("Tools").setItems(a,(d,w)->{
-            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else if(w==5)dateCalc();else appHider();
+            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else dateCalc();
         }).show();
     }
     private void appHider(){
         LinearLayout box=screen("App Hider");
+        Button back=button("Back to Vault");
+        back.setOnClickListener(v->vault());
+        box.addView(back,new LinearLayout.LayoutParams(-1,dp(48)));
         TextView info=label("Android-supported controls only. CalcVault can hide its own launcher icon. Other apps cannot be hidden by a normal app.",14,muted,false);
         info.setPadding(dp(4),dp(4),dp(4),dp(12));
         box.addView(info);
