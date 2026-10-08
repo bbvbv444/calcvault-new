@@ -2,7 +2,6 @@ package com.example.calcvault;
 
 import android.content.Context;
 import android.content.pm.ActivityInfo;
-import android.content.res.AssetManager;
 import android.content.pm.PackageManager;
 import dalvik.system.DexClassLoader;
 import java.io.*;
@@ -38,22 +37,9 @@ public final class CloneRuntime {
 
     public PreparedRuntime prepare(ApkCloneStore.CloneRecord clone) throws IOException {
         if(clone==null) throw new IOException("Clone record missing");
+
         File apk=new File(clone.apkPath);
         if(!apk.isFile()) throw new IOException("Private APK is missing");
-
-        PackageManager pm=context.getPackageManager();
-        android.content.pm.PackageInfo info=pm.getPackageArchiveInfo(
-                runtimeApk.getAbsolutePath(),
-                PackageManager.GET_ACTIVITIES | PackageManager.GET_META_DATA
-        );
-        if(info==null || info.applicationInfo==null){
-            throw new IOException("Private APK could not be inspected");
-        }
-
-        String launchActivity=findLaunchActivity(info);
-        if(launchActivity==null || launchActivity.isEmpty()){
-            throw new IOException("No launchable activity found");
-        }
 
         File root=new File(context.getFilesDir(),"app_clones/"+clone.id+"/runtime");
         File data=new File(root,"data");
@@ -69,11 +55,28 @@ public final class CloneRuntime {
         makeDir(apkRoot,"runtime APK folder");
 
         File runtimeApk=new File(apkRoot,"base.apk");
-        if(!runtimeApk.isFile() || runtimeApk.length()!=apk.length()) copyFile(apk,runtimeApk);
+        if(!runtimeApk.isFile() || runtimeApk.length()!=apk.length()){
+            copyFile(apk,runtimeApk);
+        }
+
+        PackageManager pm=context.getPackageManager();
+        android.content.pm.PackageInfo info=pm.getPackageArchiveInfo(
+                runtimeApk.getAbsolutePath(),
+                PackageManager.GET_ACTIVITIES | PackageManager.GET_META_DATA
+        );
+        if(info==null || info.applicationInfo==null){
+            throw new IOException("Private APK could not be inspected");
+        }
+
+        String launchActivity=findLaunchActivity(info);
+        if(launchActivity==null || launchActivity.isEmpty()){
+            throw new IOException("No launchable activity found");
+        }
+
         extractDexFiles(runtimeApk,dexRoot);
 
         DexClassLoader loader=new DexClassLoader(
-                apk.getAbsolutePath(),
+                runtimeApk.getAbsolutePath(),
                 dexRoot.getAbsolutePath(),
                 null,
                 context.getClassLoader()
@@ -93,22 +96,12 @@ public final class CloneRuntime {
         }
 
         String metadata="{\n"
-                +"  \"packageName\": \""+escape(clone.packageName)+"\",\n"
-                +"  \"label\": \""+escape(clone.label)+"\",\n"
-                +"  \"launchActivity\": \""+escape(launchActivity)+"\",\n"
-                +"  \"applicationClass\": \""+escape(applicationClass)+"\",\n"
-                +"  \"preparedAt\": "+System.currentTimeMillis()+"\n"
+                +"  \\"packageName\\": \\""+escape(clone.packageName)+"\\",\n"
+                +"  \\"label\\": \\""+escape(clone.label)+"\\",\n"
+                +"  \\"launchActivity\\": \\""+escape(launchActivity)+"\\",\n"
+                +"  \\"applicationClass\\": \\""+escape(applicationClass)+"\\",\n"
+                +"  \\"preparedAt\\": "+System.currentTimeMillis()+"\n"
                 +"}\n";
-        // Resource-layer probe: Android can inspect the cloned APK resources
-        // even though the APK is not installed as a second Android package.
-        try{
-            AssetManager assets=new AssetManager();
-            int cookie=assets.addAssetPath(runtimeApk.getAbsolutePath());
-            if(cookie==0)throw new IOException("Clone resources could not be mounted");
-            assets.close();
-        }catch(Throwable e){
-            throw new IOException("Clone resources could not be loaded",e);
-        }
 
         write(new File(root,"runtime.json"),metadata);
         write(new File(root,"READY"),"prepared\n");
@@ -144,7 +137,7 @@ public final class CloneRuntime {
             byte[] buffer=new byte[8192];
             while((entry=zin.getNextEntry())!=null){
                 String name=entry.getName();
-                if(entry.isDirectory() || !name.matches("classes([2-9][0-9]*|[0-9]+)?\\.dex")){
+                if(entry.isDirectory() || !name.matches("classes([2-9][0-9]*|[0-9]+)?\\\\.dex")){
                     continue;
                 }
                 File out=new File(dexRoot,new File(name).getName());
@@ -173,7 +166,7 @@ public final class CloneRuntime {
 
     private static String escape(String s){
         if(s==null)return "";
-        return s.replace("\\\\","\\\\\\\\").replace("\"","\\\"");
+        return s.replace("\\\\","\\\\\\\\").replace("\"","\\\\\"");
     }
 
     private static void write(File file,String text)throws IOException{
