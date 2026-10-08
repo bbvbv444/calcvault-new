@@ -26,6 +26,7 @@ public final class VirtualActivityHost {
     private final Intent routedIntent;
     private State state;
     private String error;
+    private VirtualExecutionBoundary.State executionState;
 
     private VirtualActivityHost(
             Activity host,
@@ -57,6 +58,7 @@ public final class VirtualActivityHost {
                 session.getResolution().classLoader,
                 routed);
         result.state = State.RESOLVED;
+        result.executionState = VirtualExecutionBoundary.inspect(session.getResolution());
         return result;
     }
 
@@ -91,6 +93,14 @@ public final class VirtualActivityHost {
         return state;
     }
 
+    public VirtualExecutionBoundary.State getExecutionState() {
+        return executionState;
+    }
+
+    public String getExecutionMessage() {
+        return VirtualExecutionBoundary.explain(executionState);
+    }
+
     public String getError() {
         return error;
     }
@@ -98,6 +108,10 @@ public final class VirtualActivityHost {
     public Bundle toBundle() {
         Bundle result = session.buildInitialState();
         result.putString("calcvault_virtual_host_state", state.name());
+        if (executionState != null) {
+            result.putString("calcvault_virtual_execution_state", executionState.name());
+            result.putString("calcvault_virtual_execution_message", getExecutionMessage());
+        }
         result.putString(
                 "calcvault_virtual_component",
                 String.valueOf(routedIntent.getComponent()));
