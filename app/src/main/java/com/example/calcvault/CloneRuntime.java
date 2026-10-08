@@ -2,6 +2,7 @@ package com.example.calcvault;
 
 import android.content.Context;
 import android.content.pm.ActivityInfo;
+import android.content.res.AssetManager;
 import android.content.pm.PackageManager;
 import dalvik.system.DexClassLoader;
 import java.io.*;
@@ -42,7 +43,7 @@ public final class CloneRuntime {
 
         PackageManager pm=context.getPackageManager();
         android.content.pm.PackageInfo info=pm.getPackageArchiveInfo(
-                apk.getAbsolutePath(),
+                runtimeApk.getAbsolutePath(),
                 PackageManager.GET_ACTIVITIES | PackageManager.GET_META_DATA
         );
         if(info==null || info.applicationInfo==null){
@@ -59,13 +60,17 @@ public final class CloneRuntime {
         File cache=new File(root,"cache");
         File files=new File(root,"files");
         File dexRoot=new File(root,"dex");
+        File apkRoot=new File(root,"apk");
         makeDir(root,"runtime folder");
         makeDir(data,"runtime data folder");
         makeDir(cache,"runtime cache folder");
         makeDir(files,"runtime files folder");
         makeDir(dexRoot,"runtime dex folder");
+        makeDir(apkRoot,"runtime APK folder");
 
-        extractDexFiles(apk,dexRoot);
+        File runtimeApk=new File(apkRoot,"base.apk");
+        if(!runtimeApk.isFile() || runtimeApk.length()!=apk.length()) copyFile(apk,runtimeApk);
+        extractDexFiles(runtimeApk,dexRoot);
 
         DexClassLoader loader=new DexClassLoader(
                 apk.getAbsolutePath(),
@@ -94,6 +99,17 @@ public final class CloneRuntime {
                 +"  \"applicationClass\": \""+escape(applicationClass)+"\",\n"
                 +"  \"preparedAt\": "+System.currentTimeMillis()+"\n"
                 +"}\n";
+        // Resource-layer probe: Android can inspect the cloned APK resources
+        // even though the APK is not installed as a second Android package.
+        try{
+            AssetManager assets=new AssetManager();
+            int cookie=assets.addAssetPath(runtimeApk.getAbsolutePath());
+            if(cookie==0)throw new IOException("Clone resources could not be mounted");
+            assets.close();
+        }catch(Throwable e){
+            throw new IOException("Clone resources could not be loaded",e);
+        }
+
         write(new File(root,"runtime.json"),metadata);
         write(new File(root,"READY"),"prepared\n");
 
@@ -140,6 +156,15 @@ public final class CloneRuntime {
             }
         }
         if(!found)throw new IOException("Clone APK contains no dex code");
+    }
+
+    private static void copyFile(File source,File target)throws IOException{
+        File parent=target.getParentFile();
+        if(parent!=null&&!parent.exists()&&!parent.mkdirs())throw new IOException("Could not create APK folder");
+        try(InputStream in=new FileInputStream(source);OutputStream out=new FileOutputStream(target)){
+            byte[] buffer=new byte[8192];int n;
+            while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+        }
     }
 
     private static void makeDir(File dir,String what)throws IOException{
