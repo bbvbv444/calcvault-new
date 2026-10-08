@@ -337,6 +337,17 @@ public class MainActivity extends Activity {
             }).show();
     }
 
+    private UserHandle findPrivateProfile(){
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            if(la==null)return null;
+            for(UserHandle u:la.getProfiles()){
+                if(!android.os.Process.myUserHandle().equals(u))return u;
+            }
+        }catch(Exception ignored){}
+        return null;
+    }
+
     private void prepareCopiedAppForOpening(ApkCloneStore.CloneRecord record){
         if(record==null||record.packageName==null||record.packageName.trim().isEmpty()){
             toast("This private copy is missing its package name");
