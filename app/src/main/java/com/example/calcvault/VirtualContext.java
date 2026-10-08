@@ -35,7 +35,10 @@ public final class VirtualContext extends ContextWrapper {
 
         try {
             AssetManager manager = AssetManager.class.getDeclaredConstructor().newInstance();
-            int cookie = manager.addAssetPath(instance.apkFile.getAbsolutePath());
+            java.lang.reflect.Method addAssetPath = AssetManager.class.getMethod(
+                    "addAssetPath", String.class);
+            int cookie = ((Integer) addAssetPath.invoke(
+                    manager, instance.apkFile.getAbsolutePath())).intValue();
             if (cookie == 0) {
                 throw new IOException("Could not load virtual APK resources");
             }
