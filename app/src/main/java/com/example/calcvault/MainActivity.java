@@ -447,8 +447,7 @@ public class MainActivity extends Activity {
         start.setOnClickListener(v->{
             if(recording[0])return;
             try{
-                File dir=new File(getFilesDir(),"vault_files");
-                if(!dir.exists()&&!dir.mkdirs())throw new IOException("folder");
+                File dir=new File(getFilesDir(),"vault_files");                if(!dir.exists()&&!dir.mkdirs())throw new IOException("folder");
                 File nm=new File(dir,nextHumanFileName("Private Voice Recording",".m4a"));
                 recordingFile=nm;
 
@@ -634,7 +633,6 @@ public class MainActivity extends Activity {
         input.setTextColor(fg);
         input.setHintTextColor(muted);
         input.setSingleLine(true);
-        input.setFilters(new android.text.InputFilter[]{maxWordsFilter()});
         input.setPadding(dp(12),dp(8),dp(12),dp(8));
 
         LinearLayout box=new LinearLayout(this);
@@ -649,8 +647,9 @@ public class MainActivity extends Activity {
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
             public void onTextChanged(CharSequence s,int st,int before,int countChanged){
                 int words=countWords(s.toString());
-                count.post(()->count.setText(words+"/15 words"));
+                count.setText(words+"/15 words");
                 count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+                count.invalidate();
             }
             public void afterTextChanged(android.text.Editable e){}
         });
@@ -897,8 +896,7 @@ public class MainActivity extends Activity {
             if(!f.exists()){toast("This saved file is missing");return;}
             String mime=o.optString("mime","application/octet-stream");
             if(mime.startsWith("image/")){ viewPrivateImage(f); return; }
-            if(mime.startsWith("video/")){ viewPrivateVideo(f); return; }
-            Uri uri=Uri.parse("content://com.example.calcvault.privatefiles/file/"+Uri.encode(f.getName()));
+            if(mime.startsWith("video/")){ viewPrivateVideo(f); return; }            Uri uri=Uri.parse("content://com.example.calcvault.privatefiles/file/"+Uri.encode(f.getName()));
             Intent i=new Intent(Intent.ACTION_VIEW);i.setDataAndType(uri,o.optString("mime","application/octet-stream"));
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             i.setClipData(ClipData.newRawUri("CalcVault",uri));
