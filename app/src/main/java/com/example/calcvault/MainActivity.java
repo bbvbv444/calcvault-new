@@ -251,9 +251,9 @@ public class MainActivity extends Activity {
     private boolean matches(String s,String q){return q.isEmpty()||s.toLowerCase(Locale.US).contains(q);}
 
     private void addItemDialog(){
-        String[] choices={"Note","Link","File / Image","Private contact"};
+        String[] choices={"Note","Link","File / Image","Private contact","Record audio"};
         new AlertDialog.Builder(this).setTitle("Add item").setItems(choices,(d,w)->{
-            if(w==0)addText(false);else if(w==1)addText(true);else if(w==2)pickFile();else addPrivateContact();
+            if(w==0)addText(false);else if(w==1)addText(true);else if(w==2)pickFile();else if(w==3)addPrivateContact();else recordAudio();
         }).show();
     }
 
@@ -279,14 +279,21 @@ public class MainActivity extends Activity {
     }
 
     private void recordAudio(){
-        if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO},REQUEST_AUDIO);return;}
+        if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+            new AlertDialog.Builder(this).setTitle("Microphone permission")
+                .setMessage("CalcVault needs microphone access only when you choose Record audio, so it can save your recording privately.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Allow", (d,w)->requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO},REQUEST_AUDIO))
+                .show();
+            return;
+        }
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
         TextView status=label("Ready to record",16,fg,true);Button start=button("Start recording");Button stop=button("Stop and save");stop.setEnabled(false);
         box.addView(status);box.addView(start);box.addView(stop);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Private Audio Recorder").setView(box).setNegativeButton("Close",(which,w)->{try{if(recorder!=null){recorder.stop();recorder.release();recorder=null;}}catch(Exception ignored){}if(recordingFile!=null)recordingFile.delete();recordingFile=null;}).create();dialog.show();
         start.setOnClickListener(v->{try{
             File dir=new File(getFilesDir(),"vault_files");if(!dir.exists())dir.mkdirs();
-            File nm=new File(dir,nextHumanFileName("Voice Note",".m4a"));
+            File nm=new File(dir,nextHumanFileName("Private Audio Recording",".m4a"));
             recordingFile=nm;android.media.MediaRecorder r=new android.media.MediaRecorder();recorder=r;
             r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);r.setOutputFile(nm.getAbsolutePath());r.prepare();r.start();
             status.setText("Recording…");start.setEnabled(false);stop.setEnabled(true);
@@ -454,11 +461,11 @@ public class MainActivity extends Activity {
     private String humanMediaName(String mime,String originalName){
         String ext=extensionForMime(mime,originalName);
         String base;
-        if(mime!=null&&mime.startsWith("image/")) base="Photo";
-        else if(mime!=null&&mime.startsWith("video/")) base="Video";
-        else if(mime!=null&&mime.startsWith("audio/")) base="Voice Note";
-        else if("application/pdf".equalsIgnoreCase(mime)) base="Document";
-        else base="File";
+        if(mime!=null&&mime.startsWith("image/")) base="Private Photo";
+        else if(mime!=null&&mime.startsWith("video/")) base="Private Video";
+        else if(mime!=null&&mime.startsWith("audio/")) base="Private Audio Recording";
+        else if("application/pdf".equalsIgnoreCase(mime)) base="Private Document";
+        else base="Private File";
         return nextHumanFileName(base,ext);
     }
 
@@ -718,127 +725,3 @@ public class MainActivity extends Activity {
         try{
             File dir=new File(getFilesDir(),"vault_backups");if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create backup folder");
             File out=new File(dir,"CalcVault-backup-"+System.currentTimeMillis()+".zip");
-            ZipOutputStream z=new ZipOutputStream(new FileOutputStream(out));
-            JSONObject meta=new JSONObject();meta.put("version",1);meta.put("notes",new JSONArray(notes));meta.put("links",new JSONArray(links));
-            JSONArray fa=new JSONArray();
-            for(String raw:files){try{JSONObject m=new JSONObject(raw);fa.put(new JSONObject().put("name",m.optString("name")).put("mime",m.optString("mime")).put("entry","files/"+new File(m.optString("path")).getName()));}catch(Exception ignored){}}
-            meta.put("files",fa);
-            z.putNextEntry(new ZipEntry("calcvault.json"));z.write(meta.toString(2).getBytes(StandardCharsets.UTF_8));z.closeEntry();
-            for(String raw:files){try{JSONObject m=new JSONObject(raw);File f=new File(m.optString("path"));if(f.exists()){z.putNextEntry(new ZipEntry("files/"+f.getName()));try(FileInputStream in=new FileInputStream(f)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)z.write(b,0,n);}z.closeEntry();}}catch(Exception ignored){}}
-            z.close();
-            Uri uri=Uri.parse("content://com.example.calcvault.privatefiles/backup/"+Uri.encode(out.getName()));
-            Intent send=new Intent(Intent.ACTION_SEND);send.setType("application/zip");send.putExtra(Intent.EXTRA_STREAM,uri);
-            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);send.setClipData(ClipData.newRawUri("CalcVault backup",uri));
-            startActivity(Intent.createChooser(send,"Export CalcVault backup"));
-        }catch(Exception e){toast("Backup failed");}
-    }
-
-    private void importBackup(Uri source){
-        try{
-            File dir=new File(getFilesDir(),"vault_files");if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create private folder");
-            File noMedia=new File(dir,".nomedia"); if(!noMedia.exists())noMedia.createNewFile();
-            File temp=new File(getCacheDir(),"import.zip");
-            try(InputStream in=getContentResolver().openInputStream(source);FileOutputStream out=new FileOutputStream(temp)){
-                if(in==null)throw new IOException("Cannot read backup");byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);
-            }
-            JSONObject meta=null;ArrayList<String> imported=new ArrayList<>();
-            try(ZipInputStream z=new ZipInputStream(new FileInputStream(temp))){
-                ZipEntry e;byte[] b=new byte[8192];
-                while((e=z.getNextEntry())!=null){
-                    if(e.isDirectory())continue;String n=e.getName();
-                    if("calcvault.json".equals(n)){ByteArrayOutputStream bout=new ByteArrayOutputStream();int x;while((x=z.read(b))!=-1)bout.write(b,0,x);meta=new JSONObject(bout.toString(StandardCharsets.UTF_8.name()));}
-                    else if(n.startsWith("files/")&&!n.contains("..")){
-                        String fn=new File(n).getName();File dest=new File(dir,fn);try(FileOutputStream out=new FileOutputStream(dest)){int x;while((x=z.read(b))!=-1)out.write(b,0,x);}imported.add(dest.getAbsolutePath());
-                    }
-                }
-            }
-            if(meta==null)throw new IOException("Invalid backup");
-            notes.clear();links.clear();files.clear();
-            JSONArray ns=meta.optJSONArray("notes");if(ns!=null)for(int i=0;i<ns.length();i++)notes.add(ns.optString(i));
-            JSONArray ls=meta.optJSONArray("links");if(ls!=null)for(int i=0;i<ls.length();i++)links.add(ls.optString(i));
-            JSONArray fs=meta.optJSONArray("files");if(fs!=null)for(int i=0;i<fs.length()&&i<imported.size();i++){JSONObject m=fs.optJSONObject(i);if(m!=null){JSONObject saved=new JSONObject();saved.put("name",m.optString("name",new File(imported.get(i)).getName()));saved.put("mime",m.optString("mime","application/octet-stream"));saved.put("path",imported.get(i));files.add(saved.toString());}}
-            saveLists();temp.delete();if(unlocked)vault();toast("Backup imported successfully");
-        }catch(Exception e){toast("Could not import that backup");}
-    }
-
-    private void deleteAll(){
-        if(!hasKey()){toast("No vault key exists");return;}
-        EditText e=pinField("Enter your vault key to continue");
-        AlertDialog d=new AlertDialog.Builder(this).setTitle("Delete all data")
-            .setMessage("This permanently removes the vault key, notes, links, and private files from CalcVault.")
-            .setView(e).setNegativeButton("Cancel",null).setPositiveButton("Delete",null).create();
-        d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{
-            String entered=e.getText().toString();
-            if(entered.isEmpty()){e.setError("Enter your vault key");return;}
-            if(!hash(entered).equals(get(KEY_HASH))){e.setError("Wrong vault key");return;}
-            deletePrivateFiles();
-            notes.clear();links.clear();files.clear();contacts.clear();favorites.clear();
-            prefs.edit().clear().apply();
-            unlocked=false;d.dismiss();buildHome();
-            new Handler().postDelayed(this::createKey,250);
-            toast("All CalcVault data deleted");
-        }));
-        d.show();
-    }
-
-    private String itemKey(String type,String value){return hash(type+"|"+value);}
-    private boolean isFavorite(String type,String value){return favorites.contains(itemKey(type,value));}
-    private void toggleFavorite(String type,String value){String k=itemKey(type,value);if(favorites.contains(k))favorites.remove(k);else favorites.add(k);saveLists();}
-
-    private void deletePrivateFiles(){
-        File dir=new File(getFilesDir(),"vault_files");File[] fs=dir.listFiles();
-        if(fs!=null)for(File f:fs)if(f.isFile())f.delete();
-    }
-
-    private void theme(){prefs.edit().putBoolean(THEME,!prefs.getBoolean(THEME,false)).apply();toast("Theme preference saved; restart to apply.");}
-
-    private boolean isPro(){return true;}
-    private boolean hasKey(){return !get(KEY_HASH).isEmpty();}
-    private String get(String k){return prefs.getString(k,"");}
-    private void loadLists(){load(notes,NOTES);load(links,LINKS);load(files,FILES);load(contacts,CONTACTS);migrateOldFileNames();String f=prefs.getString(FAVORITES,"");if(!f.isEmpty())try{JSONArray j=new JSONArray(f);for(int i=0;i<j.length();i++)favorites.add(j.optString(i));}catch(Exception ignored){}}
-    private void migrateOldFileNames(){
-        boolean changed=false;
-        for(int i=0;i<files.size();i++){
-            try{
-                JSONObject o=new JSONObject(files.get(i));
-                String name=o.optString("name","");
-                File old=new File(o.optString("path",""));
-                if(name.matches("\\d+_.*")||name.matches("\\d+")||name.endsWith("_scan.pdf")||name.endsWith("_voice_note.m4a")){
-                    String friendly=humanMediaName(o.optString("mime",""),name);
-                    File fresh=new File(old.getParentFile(),friendly);
-                    if(old.exists()&&old.renameTo(fresh)){o.put("name",friendly);o.put("path",fresh.getAbsolutePath());files.set(i,o.toString());changed=true;}
-                }
-            }catch(Exception ignored){}
-        }
-        if(changed)saveLists();
-    }
-
-    private void load(ArrayList<String> a,String k){
-        String s=prefs.getString(k,"");if(s.isEmpty())return;
-        try{JSONArray j=new JSONArray(s);for(int i=0;i<j.length();i++)a.add(j.optString(i));return;}catch(Exception ignored){}
-        for(String x:s.split("\\u0001",-1))if(!x.isEmpty())a.add(x);
-    }
-    private void saveLists(){prefs.edit().putString(NOTES,toJson(notes)).putString(LINKS,toJson(links)).putString(FILES,toJson(files)).putString(CONTACTS,toJson(contacts)).putString(FAVORITES,toJson(new ArrayList<>(favorites))).apply();}
-    private String toJson(ArrayList<String>a){JSONArray j=new JSONArray();for(String x:a)j.put(x);return j.toString();}
-
-    private String hash(String s){try{byte[] b=MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));StringBuilder x=new StringBuilder();for(byte q:b)x.append(String.format(Locale.US,"%02x",q));return x.toString();}catch(Exception e){return "";}}
-    private String fmt(double n){if(Double.isNaN(n)||Double.isInfinite(n))return "Error";if(n==Math.rint(n))return String.format(Locale.US,"%.0f",n);return String.format(Locale.US,"%.10f",n).replaceAll("0+$","").replaceAll("\\.$","");}
-    private void show(String s){
-        if(display==null||resultDisplay==null)return;
-        int p=s.indexOf("\n");
-        if(p>=0){display.setText(s.substring(0,p)); resultDisplay.setText(s.substring(p+1));}
-        else {display.setText(""); resultDisplay.setText(s);}
-        display.post(()->{ if(display.getParent() instanceof HorizontalScrollView){ ((HorizontalScrollView)display.getParent()).fullScroll(HorizontalScrollView.FOCUS_RIGHT); } });
-    }
-
-    private LinearLayout screen(String title){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);v.setPadding(dp(14),dp(14),dp(14),dp(14));v.setBackgroundColor(bg);v.addView(label(title,22,fg,true));return v;}
-    private TextView label(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(null,1);t.setPadding(dp(4),dp(4),dp(4),dp(4));return t;}
-    private Button button(String s){Button b=new Button(this);b.setText(s);b.setTextSize(15);b.setAllCaps(false);b.setTextColor(fg);b.setBackgroundColor(panel);return b;}
-    private EditText pinField(String hint){EditText e=new EditText(this);e.setHint(hint);e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);e.setTransformationMethod(PasswordTransformationMethod.getInstance());e.setTextColor(fg);e.setHintTextColor(muted);e.setPadding(dp(8),dp(8),dp(8),dp(8));return e;}
-    private EditText numberField(String hint){EditText e=new EditText(this);e.setHint(hint);e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);return e;}
-    private LinearLayout twoFields(String a,String b){LinearLayout x=new LinearLayout(this);x.setOrientation(LinearLayout.VERTICAL);x.addView(numberField(a));x.addView(numberField(b));return x;}
-    private LinearLayout threeFields(String a,String b,String c){LinearLayout x=twoFields(a,b);x.addView(numberField(c));return x;}
-    private EditText[] fields(LinearLayout x){EditText[] r=new EditText[x.getChildCount()];for(int i=0;i<r.length;i++)r[i]=(EditText)x.getChildAt(i);return r;}
-    private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
-    private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
-}
