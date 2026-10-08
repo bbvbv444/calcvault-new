@@ -1012,7 +1012,7 @@ public class MainActivity extends Activity {
         box.addView(info);
         LinearLayout self=new LinearLayout(this);self.setOrientation(LinearLayout.VERTICAL);self.setPadding(dp(10),dp(10),dp(10),dp(10));self.setBackgroundColor(panel);
         self.addView(label("CalcVault",17,fg,true));
-        boolean hidden=!getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher")).equals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED);
+        int launcherState=getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"));\n        boolean hidden=launcherState==PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
         Button selfButton=button(hidden?"Restore CalcVault launcher icon":"Hide CalcVault launcher icon");
         self.addView(label(hidden?"The launcher icon is currently hidden. Tap the recovery notification to reopen CalcVault.":"This removes only the launcher icon. CalcVault itself remains installed and usable.",13,muted,false));
         self.addView(selfButton,new LinearLayout.LayoutParams(-1,dp(48)));
