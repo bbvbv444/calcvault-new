@@ -38,7 +38,10 @@ public final class VirtualActivitySession {
                 new VirtualActivityExecutor(host.getClassLoader());
         VirtualActivityExecutor.Resolution resolution = executor.resolve(prepared);
 
-        VirtualContext context = new VirtualContext(host, prepared.instance);
+        VirtualApplicationLoader.LoadedApplication application =
+                new VirtualApplicationLoader(host).load(prepared.instance);
+
+        VirtualContext context = application.context;
 
         Intent source = new Intent(prepared.launchPlan.sourceIntent);
         source.setClassName(
