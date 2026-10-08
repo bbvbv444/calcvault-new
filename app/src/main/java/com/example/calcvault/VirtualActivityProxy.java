@@ -53,9 +53,14 @@ public final class VirtualActivityProxy extends Activity {
             virtualHost.markReady();
 
             Intent routedIntent = virtualHost.getRoutedIntent();
+            VirtualApplicationLoader.LoadedApplication application =
+                    virtualHost.getSession().getApplication();
 
             statusView.setText(
                     "Virtual runtime ready\n\n" +
+                    "Application: " +
+                    application.className +
+                    "\n\n" +
                     "Activity: " +
                     virtualHost.getSession().getActivityClassName() +
                     "\n\n" +
