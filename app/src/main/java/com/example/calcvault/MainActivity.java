@@ -1177,7 +1177,7 @@ public class MainActivity extends Activity {
         try{
             android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
             for(UserHandle u:la.getProfiles()){
-                if(!UserHandle.myUserHandle().equals(u))return u;
+                if(!android.os.Process.myUserHandle().equals(u))return u;
             }
         }catch(Exception ignored){}
         return null;
