@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
         loadLists();
         buildHome();
@@ -84,7 +85,7 @@ public class MainActivity extends Activity {
         TextView top=label("Calculator",20,fg,true); root.addView(top,new LinearLayout.LayoutParams(-1,dp(48)));
         LinearLayout displayBox=new LinearLayout(this); displayBox.setOrientation(LinearLayout.VERTICAL); displayBox.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
         HorizontalScrollView equationScroll=new HorizontalScrollView(this); equationScroll.setHorizontalScrollBarEnabled(false); equationScroll.setFillViewport(true);
-        display=label("",30,fg,false); display.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL); display.setSingleLine(true); display.setHorizontallyScrolling(true);
+        display=label("",30,fg,false); display.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL); display.setSingleLine(true); display.setHorizontallyScrolling(true); display.setTextIsSelectable(false);
         equationScroll.addView(display,new HorizontalScrollView.LayoutParams(-2,dp(58)));
         resultDisplay=label("0",42,fg,false); resultDisplay.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL); resultDisplay.setSingleLine(true);
         displayBox.addView(equationScroll,new LinearLayout.LayoutParams(-1,dp(62))); displayBox.addView(resultDisplay,new LinearLayout.LayoutParams(-1,dp(70)));
@@ -114,7 +115,7 @@ public class MainActivity extends Activity {
 
     private void calcKey(String k){
         if("C".equals(k)){current="";operator="";stored=0;fresh=true;expression="";show("0");return;}
-        if("⌫".equals(k)){if(!current.isEmpty())current=current.substring(0,current.length()-1);show(expression.isEmpty()?current:expression);return;}
+        if("⌫".equals(k)){if(!current.isEmpty()){current=current.substring(0,current.length()-1);if(!expression.isEmpty()&&!"+−×÷".contains(String.valueOf(expression.charAt(expression.length()-1))))expression=expression.substring(0,expression.length()-1);}else if(!expression.isEmpty()&&"+−×÷".indexOf(expression.charAt(expression.length()-1))>=0){expression=expression.substring(0,expression.length()-1);operator="";}show(expression.isEmpty()?"0":expression);return;}
         if("%".equals(k)){try{current=fmt(Double.parseDouble(current.isEmpty()?"0":current)/100);show(expression.isEmpty()?current:expression+"\n"+current);}catch(Exception ignored){}return;}
         if("=".equals(k)){
             if(hasKey() && operator.isEmpty() && !current.isEmpty() && get(KEY_HASH).equals(hash(current))){
@@ -220,17 +221,17 @@ public class MainActivity extends Activity {
             String shown=fileSection?fileName(s):s;
             if(!query.isEmpty()&&!shown.toLowerCase(Locale.US).contains(query))continue;
             any=true;
-            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-            TextView t=label("• "+shown,15,fg,false);t.setPadding(dp(8),dp(8),dp(4),dp(8));
+            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(0,dp(6),0,dp(6));
+            TextView t=label("• "+shown,15,fg,false);t.setPadding(dp(10),dp(12),dp(8),dp(12));
             if(fileSection)t.setOnClickListener(x->openPrivateFile(s));
-            row.addView(t,new LinearLayout.LayoutParams(0,dp(52),1));
+            row.addView(t,new LinearLayout.LayoutParams(0,dp(64),1));
             String type=title.equals("Notes")?"note":title.equals("Links")?"link":title.equals("Private Contacts")?"contact":"file";
             Button star=button(isFavorite(type,s)?"★":"☆");star.setTextSize(18);star.setOnClickListener(x->{toggleFavorite(type,s);renderItems(v,query);});row.addView(star,new LinearLayout.LayoutParams(dp(48),dp(44)));
             if(fileSection){
                 try{JSONObject m=new JSONObject(s);String mime=m.optString("mime","");if(mime.startsWith("image/")||mime.startsWith("video/")){Button restore=button("Restore");restore.setTextSize(12);restore.setOnClickListener(x->restorePrivateMedia(s));row.addView(restore,new LinearLayout.LayoutParams(dp(82),dp(44)));}}catch(Exception ignored){}
             }
             if(title.equals("Private Contacts")){Button del=button("Delete");del.setTextSize(12);del.setOnClickListener(x->{contacts.remove(s);favorites.remove(itemKey("contact",s));saveLists();renderItems(v,query);});row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));}
-            v.addView(row);
+            v.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }
         if(!any)v.addView(label(list.isEmpty()?"Nothing saved yet":"No matching items",14,muted,false));
     }
