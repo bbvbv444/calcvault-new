@@ -110,7 +110,7 @@ public final class ApkCloneStore {
             } catch (Exception ignored) {}
         }
         try {
-            writeText(indexFile, array.toString(2));
+            writeText(indexFile, array.toString());
         } catch (IOException ignored) {}
     }
 
