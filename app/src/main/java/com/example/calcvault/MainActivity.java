@@ -654,9 +654,7 @@ public class MainActivity extends Activity {
 
         nameDialog.setOnShowListener(d->nameDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             String note=input.getText().toString().trim();
-            int words=countWords(note);
-            if(words==0){input.setError("Please add a note");return;}
-            if(words>15){input.setError("Use 15 words or fewer");return;}
+            if(!validateMediaNote(input,count)) return;
 
             try{
                 String base=note.replaceAll("[^A-Za-z0-9._ -]","_").trim();
@@ -699,6 +697,22 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Could not save that file");}
     }
 
+    private boolean validateMediaNote(EditText input, TextView count){
+        String note=input.getText().toString().trim();
+        int words=countWords(note);
+        count.setText(words+"/15 words");
+        count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+        if(words>15){
+            input.setError("Use 15 words or fewer");
+            return false;
+        }
+        if(words==0){
+            input.setError("Please add a note");
+            return false;
+        }
+        return true;
+    }
+
     private void showMediaNoteDialog(Uri source,String originalName,String mime){
         final EditText input=new EditText(this);
         input.setHint("Example: School project");
@@ -736,16 +750,8 @@ public class MainActivity extends Activity {
         dialog.setOnShowListener(d->{
             Button save=dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             save.setOnClickListener(v->{
+                if(!validateMediaNote(input,count)) return;
                 String note=input.getText().toString().trim();
-                int words=countWords(note);
-                if(words==0){
-                    input.setError("Please add a note");
-                    return;
-                }
-                if(words>15){
-                    input.setError("Use 15 words or fewer");
-                    return;
-                }
                 savePrivateFileWithName(source,originalName,mime,note);
                 dialog.dismiss();
             });
@@ -949,7 +955,7 @@ public class MainActivity extends Activity {
 
 
     private void toolsDialog(){
-        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator","History","Private Contacts","Audio Recorder","Document Scanner"};
+        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator","History"};
         new AlertDialog.Builder(this).setTitle("Tools").setItems(a,(d,w)->{
             if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else if(w==5)dateCalc();else if(w==6)history();else if(w==7)addPrivateContact();else if(w==8)recordAudio();else scanDocument();
         }).show();
