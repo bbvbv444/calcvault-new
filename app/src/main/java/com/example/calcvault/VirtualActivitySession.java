@@ -15,16 +15,19 @@ public final class VirtualActivitySession {
     private final VirtualRuntimeCoordinator.Prepared prepared;
     private final VirtualActivityExecutor.Resolution resolution;
     private final VirtualContext virtualContext;
+    private final VirtualApplicationLoader.LoadedApplication application;
     private final Intent sourceIntent;
 
     private VirtualActivitySession(
             VirtualRuntimeCoordinator.Prepared prepared,
             VirtualActivityExecutor.Resolution resolution,
             VirtualContext virtualContext,
+            VirtualApplicationLoader.LoadedApplication application,
             Intent sourceIntent) {
         this.prepared = prepared;
         this.resolution = resolution;
         this.virtualContext = virtualContext;
+        this.application = application;
         this.sourceIntent = sourceIntent;
     }
 
@@ -52,6 +55,7 @@ public final class VirtualActivitySession {
                 prepared,
                 resolution,
                 context,
+                application,
                 source);
     }
 
@@ -65,6 +69,10 @@ public final class VirtualActivitySession {
 
     public VirtualContext getVirtualContext() {
         return virtualContext;
+    }
+
+    public VirtualApplicationLoader.LoadedApplication getApplication() {
+        return application;
     }
 
     public Intent getSourceIntent() {
@@ -87,6 +95,8 @@ public final class VirtualActivitySession {
                 VirtualActivityProxy.EXTRA_APK,
                 prepared.instance.apkFile.getAbsolutePath());
         state.putString("calcvault_virtual_activity", getActivityClassName());
+        state.putString("calcvault_virtual_application", application.className);
+        state.putString("calcvault_virtual_application_loader", application.classLoader.getClass().getName());
         return state;
     }
 }
