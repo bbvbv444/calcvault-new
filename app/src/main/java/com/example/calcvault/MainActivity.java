@@ -965,9 +965,9 @@ public class MainActivity extends Activity {
 
 
     private void toolsDialog(){
-        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator","History"};
+        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator"};
         new AlertDialog.Builder(this).setTitle("Tools").setItems(a,(d,w)->{
-            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else if(w==5)dateCalc();else if(w==6)history();else if(w==7)addPrivateContact();else if(w==8)recordAudio();else scanDocument();
+            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else dateCalc();
         }).show();
     }
     private void scientific(){
@@ -1083,9 +1083,9 @@ public class MainActivity extends Activity {
     private void history(){new AlertDialog.Builder(this).setTitle("History").setMessage("Recent calculator results appear on the calculator display. Full persistent history will be added with the next data layer.").setPositiveButton("OK",null).show();}
 
     private void settingsDialog(){
-        String[] a={"Promo code","Backup data","Import data","Delete all data","Theme"};
+        String[] a={"Promo code","Backup data","Import data","Delete all data"};
         new AlertDialog.Builder(this).setTitle("Settings").setItems(a,(d,w)->{
-            if(w==0)promo();else if(w==1)backup();else if(w==2){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_BACKUP);}else if(w==3)deleteAll();else theme();
+            if(w==0)promo();else if(w==1)backup();else if(w==2){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_BACKUP);}else deleteAll();
         }).show();
     }
 
@@ -1180,8 +1180,6 @@ public class MainActivity extends Activity {
         File dir=new File(getFilesDir(),"vault_files");File[] fs=dir.listFiles();
         if(fs!=null)for(File f:fs)if(f.isFile())f.delete();
     }
-
-    private void theme(){prefs.edit().putBoolean(THEME,!prefs.getBoolean(THEME,false)).apply();toast("Theme preference saved; restart to apply.");}
 
     private boolean isPro(){return true;}
     private boolean hasKey(){return !get(KEY_HASH).isEmpty();}
