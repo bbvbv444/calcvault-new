@@ -1,6 +1,7 @@
 package com.example.calcvault;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.TextView;
@@ -46,6 +47,9 @@ public final class VirtualActivityProxy extends Activity {
             VirtualRuntimeCoordinator.Prepared prepared =
                     coordinator.prepare(clone);
 
+            VirtualIntentRouter router = new VirtualIntentRouter(this);
+            Intent routedIntent = router.routeLaunch(prepared);
+
             VirtualActivityBridge bridge =
                     VirtualActivityBridge.prepare(this, prepared);
 
@@ -53,7 +57,8 @@ public final class VirtualActivityProxy extends Activity {
                     "Virtual runtime ready\n\n" +
                     "Activity: " + bridge.getSession().getActivityClassName() +
                     "\n\n" +
-                    "Virtual Activity bridge prepared.");
+                    "Virtual component: " +
+                    String.valueOf(routedIntent.getComponent()));
         } catch (IOException e) {
             showError(e.getMessage() == null
                     ? "Virtual runtime preparation failed"
