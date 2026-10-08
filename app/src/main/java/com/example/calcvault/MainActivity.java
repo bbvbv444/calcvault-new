@@ -3,6 +3,7 @@ package com.example.calcvault;
 import android.app.*;
 import android.app.admin.DevicePolicyManager;
 import android.content.*;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -1112,7 +1113,7 @@ public class MainActivity extends Activity {
             .setMessage("Android has created the managed profile for CalcVault. The profile is separate from your normal space. Apps must be installed into the managed profile by Android before CalcVault can manage them there.")
             .setPositiveButton("Open profile settings", (d,w)->{
                 try{
-                    Intent i=new Intent(android.provider.Settings.ACTION_MANAGED_PROFILE_SETTINGS);
+                    Intent i=new Intent(android.provider.Settings.ACTION_SETTINGS);
                     startActivity(i);
                 }catch(Exception e){toast("Android did not provide profile settings");}
             })
