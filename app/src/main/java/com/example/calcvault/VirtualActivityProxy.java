@@ -13,6 +13,7 @@ public final class VirtualActivityProxy extends Activity {
     public static final String EXTRA_APK = "calcvault_virtual_apk";
 
     private TextView statusView;
+    private VirtualActivityHost virtualHost;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,15 +48,16 @@ public final class VirtualActivityProxy extends Activity {
             VirtualRuntimeCoordinator.Prepared prepared =
                     coordinator.prepare(clone);
 
-            VirtualIntentRouter router = new VirtualIntentRouter(this);
-            Intent routedIntent = router.routeLaunch(prepared);
+            virtualHost = VirtualActivityHost.create(this, prepared);
+            VirtualComponentSession.register(virtualHost);
+            virtualHost.markReady();
 
-            VirtualActivityBridge bridge =
-                    VirtualActivityBridge.prepare(this, prepared);
+            Intent routedIntent = virtualHost.getRoutedIntent();
 
             statusView.setText(
                     "Virtual runtime ready\n\n" +
-                    "Activity: " + bridge.getSession().getActivityClassName() +
+                    "Activity: " +
+                    virtualHost.getSession().getActivityClassName() +
                     "\n\n" +
                     "Virtual component: " +
                     String.valueOf(routedIntent.getComponent()));
@@ -66,6 +68,20 @@ public final class VirtualActivityProxy extends Activity {
         } catch (RuntimeException e) {
             showError("Virtual runtime could not be prepared");
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (virtualHost != null && virtualHost.getSession() != null) {
+            String cloneId = virtualHost
+                    .getSession()
+                    .getPrepared()
+                    .instance
+                    .clone
+                    .id;
+            VirtualComponentSession.remove(cloneId);
+        }
+        super.onDestroy();
     }
 
     private ApkCloneStore.CloneRecord findClone(
