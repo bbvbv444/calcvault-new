@@ -995,6 +995,22 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Could not open this video");}
     }
 
+    private void hideCalcVaultLauncher(){
+        try{
+            ComponentName alias=new ComponentName(this,getPackageName()+".CalcVaultLauncher");
+            getPackageManager().setComponentEnabledSetting(alias,PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
+            toast("CalcVault launcher icon hidden");
+        }catch(Exception e){
+            toast("Could not hide the launcher icon");
+        }
+    }
+
+    private void refreshPrivateAppsAfterProvisioning(){
+        new Handler().postDelayed(()->{
+            if(unlocked)appHider();
+        },1200);
+    }
+
     private void checkLock(){
         lockHandler.removeCallbacks(lockRunnable);        if(!unlocked)return;
         long limit=2*60*1000L;
