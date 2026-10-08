@@ -27,9 +27,13 @@ public final class VirtualApplicationLoader {
         }
 
         PackageManager pm = host.getPackageManager();
-        ApplicationInfo info = pm.getApplicationInfo(
-                instance.clone.packageName,
+        android.content.pm.PackageInfo packageInfo = pm.getPackageArchiveInfo(
+                instance.apkFile.getAbsolutePath(),
                 PackageManager.GET_META_DATA);
+        if (packageInfo == null || packageInfo.applicationInfo == null) {
+            throw new IOException("Could not read copied APK application info");
+        }
+        ApplicationInfo info = packageInfo.applicationInfo;
 
         String className = info.className;
         if (className == null || className.trim().isEmpty()) {
