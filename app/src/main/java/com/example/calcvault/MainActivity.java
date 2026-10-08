@@ -24,7 +24,7 @@ import org.json.*;
 public class MainActivity extends Activity {
     private static final String PREFS="calc_prefs", KEY_HASH="key_hash", PRO="pro", PRO_UNTIL="pro_until", NOTES="notes", LINKS="links", FILES="files", CONTACTS="contacts", FAVORITES="favorites", THEME="theme", CURRENCY_CODES="currency_codes", CURRENCY_RATES="currency_rates", CURRENCY_UPDATED="currency_updated";
     private static final int FREE_NOTES=5, FREE_LINKS=5, FREE_FILES=3;
-    private static final int PICK_FILE=44, PICK_BACKUP=45, DELETE_REQUEST=46, REQUEST_AUDIO=47, PICK_SCAN=48;
+    private static final int PICK_FILE=44, PICK_BACKUP=45, DELETE_REQUEST=46, REQUEST_AUDIO=47, PICK_SCAN=48, REQUEST_NOTIFICATIONS=49;
     private final ArrayList<String> notes=new ArrayList<>(), links=new ArrayList<>(), files=new ArrayList<>(), contacts=new ArrayList<>();
     private final HashSet<String> favorites=new HashSet<>();
     private SharedPreferences prefs;
@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private File recordingFile;
     private Uri pendingDeleteUri;
     private String pendingDeleteRaw;
+    private boolean pendingHideLauncher=false;
     private int bg=Color.rgb(24,29,38), panel=Color.rgb(43,51,65), fg=Color.WHITE, muted=Color.rgb(195,201,212), accent=Color.rgb(100,165,255);
 
     @Override public void onCreate(Bundle b){
@@ -64,7 +65,7 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
         super.onRequestPermissionsResult(requestCode,permissions,grantResults);
-        if(requestCode==REQUEST_AUDIO){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)recordAudio();else toast("Microphone permission is needed to record audio");}else if(requestCode==PICK_SCAN){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)openScannerCamera();else toast("Camera permission is needed to scan documents");}
+        if(requestCode==REQUEST_AUDIO){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)recordAudio();else toast("Microphone permission is needed to record audio");}else if(requestCode==PICK_SCAN){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)openScannerCamera();else toast("Camera permission is needed to scan documents");}else if(requestCode==REQUEST_NOTIFICATIONS){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED&&pendingHideLauncher)hideCalcVaultLauncher();else if(pendingHideLauncher)toast("Notification permission is required so you can reopen CalcVault after hiding its launcher icon");pendingHideLauncher=false;}
     }
 
     @Override protected void onNewIntent(Intent intent){
@@ -999,11 +1000,117 @@ public class MainActivity extends Activity {
 
 
     private void toolsDialog(){
-        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator"};
+        String[] a={"Scientific","Unit converter","Currency converter","BMI","Loan calculator","Date calculator","App Hider"};
         new AlertDialog.Builder(this).setTitle("Tools").setItems(a,(d,w)->{
-            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else dateCalc();
+            if(w==0)scientific();else if(w==1)unit();else if(w==2)currency();else if(w==3)bmi();else if(w==4)loan();else if(w==5)dateCalc();else appHider();
         }).show();
     }
+    private void appHider(){
+        LinearLayout box=screen("App Hider");
+        TextView info=label("Android-supported controls only. CalcVault can hide its own launcher icon. Other apps cannot be hidden by a normal app.",14,muted,false);
+        info.setPadding(dp(4),dp(4),dp(4),dp(12));
+        box.addView(info);
+        LinearLayout self=new LinearLayout(this);self.setOrientation(LinearLayout.VERTICAL);self.setPadding(dp(10),dp(10),dp(10),dp(10));self.setBackgroundColor(panel);
+        self.addView(label("CalcVault",17,fg,true));
+        boolean hidden=!getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher")).equals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED);
+        Button selfButton=button(hidden?"Restore CalcVault launcher icon":"Hide CalcVault launcher icon");
+        self.addView(label(hidden?"The launcher icon is currently hidden. Tap the recovery notification to reopen CalcVault.":"This removes only the launcher icon. CalcVault itself remains installed and usable.",13,muted,false));
+        self.addView(selfButton,new LinearLayout.LayoutParams(-1,dp(48)));
+        selfButton.setOnClickListener(v->{ if(hidden)showCalcVaultLauncher(); else requestHideCalcVaultLauncher(); });
+        box.addView(self,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView appsTitle=label("Installed apps",18,fg,true);appsTitle.setPadding(0,dp(18),0,dp(6));box.addView(appsTitle);
+        EditText search=new EditText(this);search.setHint("Search apps");search.setSingleLine(true);box.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
+        ScrollView scroll=new ScrollView(this);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list,new ScrollView.LayoutParams(-1,-2));box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        Runnable render=()->renderInstalledApps(list,search.getText().toString());
+        search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){render.run();}public void afterTextChanged(android.text.Editable e){}});
+        render.run();
+        setContentView(box);
+    }
+
+    private void renderInstalledApps(LinearLayout list,String query){
+        list.removeAllViews();
+        String q=query==null?"":query.trim().toLowerCase(Locale.US);
+        PackageManager pm=getPackageManager();
+        Intent launcherIntent=new Intent(Intent.ACTION_MAIN,null);launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        List<android.content.pm.ResolveInfo> apps=pm.queryIntentActivities(launcherIntent,PackageManager.MATCH_ALL);
+        Collections.sort(apps,(a,b)->{
+            String an=String.valueOf(a.loadLabel(pm)),bn=String.valueOf(b.loadLabel(pm));
+            return an.compareToIgnoreCase(bn);
+        });
+        int shown=0;
+        for(android.content.pm.ResolveInfo ri:apps){
+            String pkg=ri.activityInfo.packageName;
+            String name=String.valueOf(ri.loadLabel(pm));
+            if(pkg.equals(getPackageName()))continue;
+            if(!q.isEmpty()&&!name.toLowerCase(Locale.US).contains(q)&&!pkg.toLowerCase(Locale.US).contains(q))continue;
+            shown++;
+            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(dp(4),dp(8),dp(4),dp(8));
+            row.setBackgroundColor(panel);
+            row.addView(label(name,16,fg,true));
+            row.addView(label(pkg,11,muted,false));
+            LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+            Button open=button("Open");Button settings=button("App info");
+            open.setOnClickListener(v->{try{Intent i=pm.getLaunchIntentForPackage(pkg);if(i!=null)startActivity(i);else toast("Android did not provide a launch action for this app");}catch(Exception e){toast("Could not open app");}});
+            settings.setOnClickListener(v->{try{Intent i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+pkg));startActivity(i);}catch(Exception e){toast("Could not open app settings");}});
+            actions.addView(open,new LinearLayout.LayoutParams(0,dp(44),1));actions.addView(settings,new LinearLayout.LayoutParams(0,dp(44),1));
+            row.addView(actions);
+            list.addView(row,new LinearLayout.LayoutParams(-1,-2));
+            Space gap=new Space(this);list.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
+        }
+        if(shown==0)list.addView(label("No matching launchable apps found.",14,muted,false));
+    }
+
+    private void requestHideCalcVaultLauncher(){
+        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            new AlertDialog.Builder(this).setTitle("Notification permission")
+                .setMessage("Android requires notification permission so CalcVault can give you a recovery notification after its launcher icon is hidden.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Allow",(d,w)->{pendingHideLauncher=true;requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},REQUEST_NOTIFICATIONS);})
+                .show();
+            return;
+        }
+        hideCalcVaultLauncher();
+    }
+
+    private void hideCalcVaultLauncher(){
+        try{
+            PackageManager pm=getPackageManager();
+            pm.setComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"),PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
+            showHiddenLauncherRecoveryNotification();
+            toast("CalcVault launcher icon hidden");
+            buildHome();
+        }catch(Exception e){toast("Android could not hide the launcher icon");}
+    }
+
+    private void showCalcVaultLauncher(){
+        try{
+            PackageManager pm=getPackageManager();
+            pm.setComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"),PackageManager.COMPONENT_ENABLED_STATE_ENABLED,PackageManager.DONT_KILL_APP);
+            cancelHiddenLauncherRecoveryNotification();
+            toast("CalcVault launcher icon restored");
+            buildHome();
+        }catch(Exception e){toast("Could not restore the launcher icon");}
+    }
+
+    private void showHiddenLauncherRecoveryNotification(){
+        try{
+            if(Build.VERSION.SDK_INT>=26){
+                NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+                nm.createNotificationChannel(new NotificationChannel("calcvault_recovery","CalcVault recovery",NotificationManager.IMPORTANCE_LOW));
+            }
+            Intent open=new Intent(this,MainActivity.class);open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi=PendingIntent.getActivity(this,901,open,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=23?PendingIntent.FLAG_IMMUTABLE:0));
+            Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,"calcvault_recovery"):new Notification.Builder(this);
+            b.setSmallIcon(android.R.drawable.ic_menu_manage).setContentTitle("CalcVault launcher hidden").setContentText("Tap here to reopen CalcVault.").setOngoing(true).setContentIntent(pi).setAutoCancel(false);
+            if(Build.VERSION.SDK_INT<33||checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(901,b.build());
+        }catch(Exception ignored){}
+    }
+
+    private void cancelHiddenLauncherRecoveryNotification(){
+        try{((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).cancel(901);}catch(Exception ignored){}
+    }
+
     private void scientific(){
         EditText e=numberField("Number");String[] ops={"sin","cos","tan","sqrt","square","1/x"};
         new AlertDialog.Builder(this).setTitle("Scientific").setView(e).setItems(ops,(d,w)->{try{double n=Double.parseDouble(e.getText().toString());double r=w==0?Math.sin(Math.toRadians(n)):w==1?Math.cos(Math.toRadians(n)):w==2?Math.tan(Math.toRadians(n)):w==3?Math.sqrt(n):w==4?n*n:1/n;show(fmt(r));}catch(Exception x){toast("Enter a valid number");}}).show();
