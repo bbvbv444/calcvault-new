@@ -42,7 +42,7 @@ public final class VirtualActivityBridge {
         return session;
     }
 
-    public Intent buildHostIntent() {
+    public Intent buildHostIntent() throws IOException {
         Intent intent = coordinator.buildHostIntent(session.getPrepared());
         intent.putExtra(EXTRA_BRIDGE_READY, true);
         return intent;
