@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
     private File recordingFile;
     private Uri pendingDeleteUri;
     private String pendingDeleteRaw;
-    private int bg=Color.rgb(15,17,21), panel=Color.rgb(30,33,40), fg=Color.WHITE, muted=Color.rgb(175,180,190), accent=Color.rgb(90,145,255);
+    private int bg=Color.rgb(24,29,38), panel=Color.rgb(43,51,65), fg=Color.WHITE, muted=Color.rgb(195,201,212), accent=Color.rgb(100,165,255);
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
@@ -267,19 +267,19 @@ public class MainActivity extends Activity {
                 try{
                     JSONObject m=new JSONObject(s);String mime=m.optString("mime","");
                     if(mime.startsWith("image/")||mime.startsWith("video/")){
-                        Button restore=button("Restore");restore.setTextSize(12);
+                        Button restore=button("Restore");restore.setTextSize(11);
                         restore.setOnClickListener(x->restorePrivateMedia(s));
-                        row.addView(restore,new LinearLayout.LayoutParams(dp(76),dp(44)));
+                        row.addView(restore,new LinearLayout.LayoutParams(dp(62),dp(40)));
                     }
                 }catch(Exception ignored){}
-                Button del=button("Delete");del.setTextSize(12);
+                Button del=button("Delete");del.setTextSize(11);
                 del.setOnClickListener(x->confirmDeleteVaultItem(title,s,v,query));
-                row.addView(del,new LinearLayout.LayoutParams(dp(68),dp(44)));
+                row.addView(del,new LinearLayout.LayoutParams(dp(58),dp(40)));
             }
             if(title.equals("Private Contacts")){
                 Button del=button("Delete");del.setTextSize(12);
                 del.setOnClickListener(x->{contacts.remove(s);favorites.remove(itemKey("contact",s));saveLists();renderItems(v,query);});
-                row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));
+                row.addView(del,new LinearLayout.LayoutParams(dp(58),dp(40)));
             }
             if(title.equals("Notes")||title.equals("Links")){
                 Button del=button("Delete");del.setTextSize(12);
@@ -366,30 +366,35 @@ public class MainActivity extends Activity {
 
         LinearLayout box=new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(8),dp(8),dp(8),dp(8));
+        box.setPadding(dp(10),dp(10),dp(10),dp(10));
+        box.setBackgroundColor(Color.rgb(35,43,56));
         TextView status=label("Ready to record",16,fg,true);
 
         LinearLayout meter=new LinearLayout(this);
         meter.setOrientation(LinearLayout.HORIZONTAL);
         meter.setGravity(Gravity.CENTER_VERTICAL);
-        meter.setPadding(dp(4),dp(12),dp(4),dp(12));
+        meter.setPadding(dp(6),dp(12),dp(6),dp(12));
         ArrayList<View> bars=new ArrayList<>();
-        for(int i=0;i<28;i++){
+        for(int i=0;i<24;i++){
             TextView bar=new TextView(this);
             bar.setBackgroundColor(accent);
-            LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(dp(5),dp(6));
+            LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(dp(6),dp(6));
             bp.setMargins(dp(2),0,dp(2),0);
             meter.addView(bar,bp);
             bars.add(bar);
         }
 
-        Button start=button("Start recording");
-        Button stop=button("Stop and save");
-        stop.setEnabled(false);
+        Button start=button("Start Recording");
+        Button stop=button("Stop & Save Recording");
+        Button cancel=button("Cancel");
+        stop.setVisibility(View.GONE);
+        cancel.setVisibility(View.GONE);
+
         box.addView(status,new LinearLayout.LayoutParams(-1,dp(42)));
         box.addView(meter,new LinearLayout.LayoutParams(-1,dp(70)));
         box.addView(start,new LinearLayout.LayoutParams(-1,dp(48)));
         box.addView(stop,new LinearLayout.LayoutParams(-1,dp(48)));
+        box.addView(cancel,new LinearLayout.LayoutParams(-1,dp(48)));
 
         final boolean[] recording={false};
         final Handler meterHandler=new Handler(Looper.getMainLooper());
@@ -401,7 +406,7 @@ public class MainActivity extends Activity {
                 float level=Math.min(1f,amp/32767f);
                 if(level<0.06f)level=0.06f;
                 for(int i=0;i<bars.size();i++){
-                    double wave=(Math.sin(i*0.75+System.currentTimeMillis()/140.0)+1.0)/2.0;
+                    double wave=(Math.sin(i*0.8+System.currentTimeMillis()/150.0)+1.0)/2.0;
                     int h=6+Math.round(dp(42)*(0.25f+0.75f*level*(float)wave));
                     bars.get(i).getLayoutParams().height=h;
                     bars.get(i).requestLayout();
@@ -410,26 +415,21 @@ public class MainActivity extends Activity {
             }
         };
 
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Private Audio Recorder").setView(box)
-            .setNegativeButton("Close",(which,w)->{
-                recording[0]=false;
-                meterHandler.removeCallbacks(meterRunnable);
-                if(recorder!=null){
-                    try{recorder.stop();}catch(Exception ignored){}
-                    try{recorder.release();}catch(Exception ignored){}
-                    recorder=null;
-                }
-                if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
-                recordingFile=null;
-            }).create();
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Private Audio Recorder")
+            .setView(box)
+            .setNegativeButton("Close",null)
+            .create();
 
         dialog.setOnDismissListener(d->{
             recording[0]=false;
             meterHandler.removeCallbacks(meterRunnable);
             if(recorder!=null){
+                try{recorder.stop();}catch(Exception ignored){}
                 try{recorder.release();}catch(Exception ignored){}
                 recorder=null;
             }
+            if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
             recordingFile=null;
         });
         dialog.show();
@@ -453,8 +453,9 @@ public class MainActivity extends Activity {
 
                 recording[0]=true;
                 status.setText("Recording… speak now");
-                start.setEnabled(false);
-                stop.setEnabled(true);
+                start.setVisibility(View.GONE);
+                stop.setVisibility(View.VISIBLE);
+                cancel.setVisibility(View.VISIBLE);
                 meterHandler.post(meterRunnable);
             }catch(Exception e){
                 if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
@@ -494,6 +495,19 @@ public class MainActivity extends Activity {
                 meterHandler.removeCallbacks(meterRunnable);
                 toast("Could not save recording");
             }
+        });
+
+        cancel.setOnClickListener(v->{
+            recording[0]=false;
+            meterHandler.removeCallbacks(meterRunnable);
+            if(recorder!=null){
+                try{recorder.stop();}catch(Exception ignored){}
+                try{recorder.release();}catch(Exception ignored){}
+                recorder=null;
+            }
+            if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
+            recordingFile=null;
+            dialog.dismiss();
         });
     }
 
