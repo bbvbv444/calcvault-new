@@ -96,11 +96,11 @@ public final class CloneRuntime {
         }
 
         String metadata="{\n"
-                +"  \\"packageName\\": \\""+escape(clone.packageName)+"\\",\n"
-                +"  \\"label\\": \\""+escape(clone.label)+"\\",\n"
-                +"  \\"launchActivity\\": \\""+escape(launchActivity)+"\\",\n"
-                +"  \\"applicationClass\\": \\""+escape(applicationClass)+"\\",\n"
-                +"  \\"preparedAt\\": "+System.currentTimeMillis()+"\n"
+                +"  \\"packageName\\": \\""+escape(clone.packageName)+"\\",\\n"
+                +"  \\"label\\": \\""+escape(clone.label)+"\\",\\n"
+                +"  \\"launchActivity\\": \\""+escape(launchActivity)+"\\",\\n"
+                +"  \\"applicationClass\\": \\""+escape(applicationClass)+"\\",\\n"
+                +"  \\"preparedAt\\": "+System.currentTimeMillis()+"\\n"
                 +"}\n";
 
         write(new File(root,"runtime.json"),metadata);
