@@ -1,15 +1,12 @@
 package com.example.calcvault;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 public final class CloneRuntime {
     public static final class PreparedRuntime {
@@ -43,7 +40,7 @@ public final class CloneRuntime {
             throw new IOException("Private APK could not be inspected");
         }
 
-        String launchActivity=findLaunchActivity(pm,clone.packageName,apk.getAbsolutePath());
+        String launchActivity=findLaunchActivity(pm,apk.getAbsolutePath());
         if(launchActivity==null || launchActivity.isEmpty()){
             throw new IOException("No launchable activity found");
         }
@@ -68,19 +65,13 @@ public final class CloneRuntime {
         return new PreparedRuntime(clone,launchActivity,root);
     }
 
-    private String findLaunchActivity(PackageManager pm,String packageName,String apkPath){
-        try{
-            ApplicationInfo app=pm.getApplicationInfo(packageName,0);
-            Intent launch=pm.getLaunchIntentForPackage(packageName);
-            if(launch!=null && launch.getComponent()!=null)return launch.getComponent().getClassName();
-        }catch(Exception ignored){}
-
+    private String findLaunchActivity(PackageManager pm,String apkPath){
         try{
             android.content.pm.PackageInfo info=pm.getPackageArchiveInfo(apkPath,PackageManager.GET_ACTIVITIES);
             if(info!=null && info.activities!=null){
                 for(ActivityInfo a:info.activities){
-                    if(a==null)continue;
-                    if(a.exported && a.name!=null)return a.name;
+                    if(a==null || a.name==null)continue;
+                    if(a.exported)return a.name;
                 }
             }
         }catch(Exception ignored){}
