@@ -2,8 +2,19 @@
   "version": 1,
   "projects": [
     {
-      "name": "calcvault-new",
-      "path": "."
+      "id": "calcvault-new",
+      "name": "CalcVault",
+      "root": "",
+      "buildSystem": "native",
+      "settings": {},
+      "modules": [
+        {
+          "id": "app",
+          "name": "app",
+          "dir": "app"
+        }
+      ],
+      "libraries": []
     }
   ]
 }
