@@ -9,7 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public final class ApkCloneStore {\n    public static final class CloneRecord {
+public final class ApkCloneStore {
+    public static final class CloneRecord {
         public final String id, packageName, label, apkPath;
         public final long createdAt;
         public CloneRecord(String id,String packageName,String label,String apkPath,long createdAt){
