@@ -261,39 +261,32 @@ public class MainActivity extends Activity {
     }
 
     private void addCopiedAppsSection(LinearLayout v,String query){
-        UserHandle profile=findPrivateProfile();
         TextView h=label("Copied Apps",18,fg,true);
         h.setPadding(0,dp(16),0,dp(6));
         v.addView(h);
 
-        if(profile==null){
-            v.addView(label("No private app space yet.",14,muted,false));
-            return;
-        }
-
         try{
-            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
-            List<android.content.pm.LauncherActivityInfo> activities=la.getActivityList(null,profile);
-            HashSet<String> seen=new HashSet<>();
+            ApkCloneStore store=new ApkCloneStore(this);
+            List<ApkCloneStore.CloneRecord> records=store.list();
+            PackageManager pm=getPackageManager();
             int shown=0;
 
-            for(android.content.pm.LauncherActivityInfo info:activities){
-                String pkg=info.getApplicationInfo().packageName;
-                if(pkg.equals(getPackageName())||!seen.add(pkg))continue;
-
-                String nameValue=String.valueOf(info.getLabel());
-                if(nameValue==null||nameValue.equals("null")||nameValue.trim().isEmpty())nameValue=pkg;
-                final String name=nameValue;
+            for(ApkCloneStore.CloneRecord record:records){
+                String pkg=record.packageName;
+                String name=record.label==null||record.label.trim().isEmpty()?pkg:record.label;
                 if(!query.isEmpty()&&!name.toLowerCase(Locale.US).contains(query)&&!pkg.toLowerCase(Locale.US).contains(query))continue;
-
                 shown++;
+
                 LinearLayout row=new LinearLayout(this);
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(dp(8),dp(6),dp(4),dp(6));
                 row.setBackgroundColor(panel);
 
                 ImageView icon=new ImageView(this);
-                try{icon.setImageDrawable(info.getBadgedIcon(0));}catch(Exception ignored){}
+                try{
+                    android.content.pm.ApplicationInfo ai=pm.getApplicationInfo(pkg,0);
+                    icon.setImageDrawable(ai.loadIcon(pm));
+                }catch(Exception ignored){}
                 row.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
 
                 LinearLayout textBox=new LinearLayout(this);
@@ -304,12 +297,12 @@ public class MainActivity extends Activity {
 
                 Button open=button("Open Copy");
                 open.setTextSize(11);
-                open.setOnClickListener(x->launchPrivateCopy(pkg,profile));
+                open.setOnClickListener(x->prepareCopiedAppForOpening(record));
                 row.addView(open,new LinearLayout.LayoutParams(dp(82),dp(42)));
 
                 Button del=button("Delete Copy");
                 del.setTextSize(10);
-                del.setOnClickListener(x->confirmDeleteCopiedApp(pkg,name,profile));
+                del.setOnClickListener(x->confirmDeleteStoredCopy(record));
                 row.addView(del,new LinearLayout.LayoutParams(dp(82),dp(42)));
 
                 Button original=button("Uninstall Original");
@@ -322,53 +315,41 @@ public class MainActivity extends Activity {
                 v.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
             }
 
-            if(shown==0)v.addView(label("No copied apps yet.",14,muted,false));
+            if(shown==0)v.addView(label(records.isEmpty()?"No copied apps yet.":"No matching copied apps.",14,muted,false));
         }catch(Exception e){
             v.addView(label("No copied apps yet.",14,muted,false));
         }
     }
 
-    private void confirmDeleteCopiedApp(String pkg,String name,UserHandle profile){
+    private void confirmDeleteStoredCopy(ApkCloneStore.CloneRecord record){
         new AlertDialog.Builder(this)
             .setTitle("Delete private copy?")
-            .setMessage("Only the private copy of "+name+" will be removed. The original app will stay installed.")
+            .setMessage("Only the private copy of "+record.label+" will be removed. The original app will stay installed.")
             .setNegativeButton("Cancel",null)
-            .setPositiveButton("Delete Copy",(d,w)->deleteCopiedApp(pkg,profile))
-            .show();
-    }
-
-    private void deleteCopiedApp(String pkg,UserHandle profile){
-        try{
-            if(Build.VERSION.SDK_INT<28){
-                toast("Android does not support this private-copy action on this version");
-                return;
-            }
-            Intent i=new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
-            i.setData(Uri.parse("package:"+pkg));
-            i.putExtra(Intent.EXTRA_USER,profile);
-            i.putExtra(Intent.EXTRA_RETURN_RESULT,true);
-            startActivityForResult(i,912);
-        }catch(Exception e){
-            toast("Android could not open the private-copy removal screen");
-        }
-    }
-
-    private void uninstallOriginal(String pkg,String name){
-        if(pkg.equals(getPackageName())){toast("CalcVault cannot uninstall itself here");return;}
-        new AlertDialog.Builder(this)
-            .setTitle("Uninstall original?")
-            .setMessage("Android will show its normal uninstall confirmation for "+name+".")
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Continue",(d,w)->{
+            .setPositiveButton("Delete Copy",(d,w)->{
                 try{
-                    Intent i=new Intent(Intent.ACTION_UNINSTALL_PACKAGE);
-                    i.setData(Uri.parse("package:"+pkg));
-                    i.putExtra(Intent.EXTRA_RETURN_RESULT,true);
-                    startActivityForResult(i,913);
+                    new ApkCloneStore(this).delete(record.id);
+                    toast("Private copy deleted");
+                    vault();
                 }catch(Exception e){
-                    toast("Android could not open the uninstall screen");
+                    toast("Could not delete the private copy");
                 }
             }).show();
+    }
+
+    private void prepareCopiedAppForOpening(ApkCloneStore.CloneRecord record){
+        toast("Preparing private copy…");
+        new Thread(()->{
+            try{
+                CloneRuntime.PreparedRuntime runtime=new CloneRuntime(this).prepare(record);
+                runOnUiThread(()->new AlertDialog.Builder(this)
+                    .setTitle("Private copy ready")
+                    .setMessage(record.label+" is prepared in CalcVault's private runtime. Full launch/hiding of an arbitrary APK requires Android-level virtualization; CalcVault will not pretend the original app is installed as the copy.")
+                    .setPositiveButton("OK",null).show());
+            }catch(Exception e){
+                runOnUiThread(()->toast("Private copy could not be prepared"));
+            }
+        }).start();
     }
 
     private void addSection(LinearLayout v,String title,ArrayList<String> list,String query,boolean fileSection,boolean favoriteOnly){
@@ -1145,8 +1126,7 @@ public class MainActivity extends Activity {
         box.addView(back,new LinearLayout.LayoutParams(-1,dp(48)));
 
         box.addView(label("Private App Copies",18,fg,true));
-        box.addView(label("Create a private APK copy inside CalcVault. No Android managed profile is used.",14,muted,false));
-        box.addView(label("Private runtime preparation is enabled. The original app is not modified.",13,muted,false));
+        box.addView(label("Create and manage private APK copies without freezing the screen.",14,muted,false));
 
         TextView appsTitle=label("Installed apps",18,fg,true);
         appsTitle.setPadding(0,dp(18),0,dp(6));
@@ -1163,57 +1143,67 @@ public class MainActivity extends Activity {
         scroll.addView(list,new ScrollView.LayoutParams(-1,-2));
         box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
-        Runnable render=()->renderPrivateAppChoices(list,search.getText().toString(),null);
+        setContentView(box);
+        renderPrivateAppChoicesAsync(list,"");
+
         search.addTextChangedListener(new android.text.TextWatcher(){
             public void beforeTextChanged(CharSequence s,int st,int c,int a){}
-            public void onTextChanged(CharSequence s,int st,int b,int c){render.run();}
+            public void onTextChanged(CharSequence s,int st,int b,int c){renderPrivateAppChoicesAsync(list,s.toString());}
             public void afterTextChanged(android.text.Editable e){}
         });
-        render.run();
-        setContentView(box);
     }
 
-    private UserHandle findPrivateProfile(){
-        try{
-            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
-            for(UserHandle u:la.getProfiles()){
-                if(!android.os.Process.myUserHandle().equals(u))return u;
-            }
-        }catch(Exception ignored){}
-        return null;
-    }
-
-    private void renderPrivateAppChoices(LinearLayout list,String query,UserHandle ignoredProfile){
+    private void renderPrivateAppChoicesAsync(LinearLayout list,String query){
         list.removeAllViews();
-        String q=query==null?"":query.trim().toLowerCase(Locale.US);
-        PackageManager pm=getPackageManager();
-        List<android.content.pm.ApplicationInfo> apps;
-        try{
-            apps=pm.getInstalledApplications(PackageManager.MATCH_ALL);
-        }catch(Exception e){
-            apps=new ArrayList<>();
+        list.addView(label("Loading installed apps…",14,muted,false));
+        final String q=query==null?"":query.trim().toLowerCase(Locale.US);
+
+        new Thread(()->{
+            PackageManager pm=getPackageManager();
+            List<android.content.pm.ApplicationInfo> apps;
+            try{
+                apps=pm.getInstalledApplications(PackageManager.MATCH_ALL);
+            }catch(Exception e){
+                apps=new ArrayList<>();
+            }
+
+            Collections.sort(apps,(a,b)->{
+                String an=String.valueOf(a.loadLabel(pm));
+                String bn=String.valueOf(b.loadLabel(pm));
+                return an.compareToIgnoreCase(bn);
+            });
+
+            HashSet<String> clonedPackages=new HashSet<>();
+            try{
+                for(ApkCloneStore.CloneRecord r:new ApkCloneStore(this).list())clonedPackages.add(r.packageName);
+            }catch(Exception ignored){}
+
+            final ArrayList<android.content.pm.ApplicationInfo> filtered=new ArrayList<>();
+            final HashSet<String> clonedFinal=clonedPackages;
+            for(android.content.pm.ApplicationInfo info:apps){
+                String pkg=info.packageName;
+                if(pkg==null||pkg.equals(getPackageName()))continue;
+                String name=String.valueOf(info.loadLabel(pm));
+                if(name.trim().isEmpty())name=pkg;
+                if(!q.isEmpty()&&!name.toLowerCase(Locale.US).contains(q)&&!pkg.toLowerCase(Locale.US).contains(q))continue;
+                filtered.add(info);
+            }
+
+            runOnUiThread(()->populatePrivateAppChoices(list,pm,filtered,clonedFinal));
+        }).start();
+    }
+
+    private void populatePrivateAppChoices(LinearLayout list,PackageManager pm,List<android.content.pm.ApplicationInfo> apps,HashSet<String> clonedPackages){
+        list.removeAllViews();
+        if(apps.isEmpty()){
+            list.addView(label("No installed apps match your search.",14,muted,false));
+            return;
         }
-        Collections.sort(apps,(a,b)->{
-            String an=String.valueOf(a.loadLabel(pm));
-            String bn=String.valueOf(b.loadLabel(pm));
-            return an.compareToIgnoreCase(bn);
-        });
 
-        ApkCloneStore store=new ApkCloneStore(this);
-        HashSet<String> clonedPackages=new HashSet<>();
-        for(ApkCloneStore.CloneRecord r:store.list())clonedPackages.add(r.packageName);
-
-        int shown=0;
         for(android.content.pm.ApplicationInfo info:apps){
             String pkg=info.packageName;
-            if(pkg==null||pkg.equals(getPackageName()))continue;
             String name=String.valueOf(info.loadLabel(pm));
             if(name.trim().isEmpty())name=pkg;
-            if(!q.isEmpty()&&!name.toLowerCase(Locale.US).contains(q)&&!pkg.toLowerCase(Locale.US).contains(q))continue;
-            shown++;
-
-            boolean systemApp=(info.flags&android.content.pm.ApplicationInfo.FLAG_SYSTEM)!=0;
-            boolean updatedSystemApp=(info.flags&android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)!=0;
             boolean cloned=clonedPackages.contains(pkg);
 
             LinearLayout row=new LinearLayout(this);
@@ -1221,42 +1211,40 @@ public class MainActivity extends Activity {
             row.setPadding(dp(8),dp(8),dp(8),dp(8));
             row.setBackgroundColor(panel);
             row.addView(label(name,16,fg,true));
-            row.addView(label(pkg+" • "+((systemApp||updatedSystemApp)?"System app":"Installed app"),11,muted,false));
+            row.addView(label(pkg,11,muted,false));
 
             Button action=button(cloned?"Private Copy Created":"Create Private Copy");
             action.setOnClickListener(v->{
                 if(cloned){
-                    new AlertDialog.Builder(this)
-                        .setTitle("Private copy")
-                        .setMessage("The private APK copy and runtime preparation are ready. The original app has not been modified. Full in-app launch and hiding still require the next virtualization layer.")
-                        .setPositiveButton("OK",null).show();
+                    toast("Private copy already exists");
                     return;
                 }
-                try{
-                    ApkCloneImporter importer=new ApkCloneImporter(this);
-                    ApkCloneStore.CloneRecord record=importer.importInstalledPackage(pkg);
-                    toast(record.label+" copied privately");
-                    appHider();
-                }catch(Exception e){
-                    toast("Could not create the private copy");
-                }
+
+                action.setEnabled(false);
+                action.setText("Creating…");
+
+                new Thread(()->{
+                    try{
+                        ApkCloneImporter importer=new ApkCloneImporter(this);
+                        ApkCloneStore.CloneRecord record=importer.importInstalledPackage(pkg);
+                        runOnUiThread(()->{
+                            toast(record.label+" copied privately");
+                            renderPrivateAppChoicesAsync(list,"");
+                            vault();
+                        });
+                    }catch(Exception e){
+                        runOnUiThread(()->{
+                            action.setEnabled(true);
+                            action.setText("Create Private Copy");
+                            toast("Could not create the private copy");
+                        });
+                    }
+                }).start();
             });
             row.addView(action,new LinearLayout.LayoutParams(-1,dp(46)));
             list.addView(row,new LinearLayout.LayoutParams(-1,-2));
             Space gap=new Space(this);
             list.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
-        }
-        if(shown==0)list.addView(label("No installed apps match your search.",14,muted,false));
-    }
-
-    private void launchPrivateCopy(String pkg,UserHandle profile){
-        try{
-            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
-            List<android.content.pm.LauncherActivityInfo> list=la.getActivityList(pkg,profile);
-            if(list.isEmpty()){toast("Private copy is not available");return;}
-            la.startMainActivity(list.get(0).getComponentName(),profile,null,null);
-        }catch(Exception e){
-            toast("Android could not launch the private copy");
         }
     }
 
