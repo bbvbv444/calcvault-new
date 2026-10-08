@@ -22,11 +22,19 @@ public final class ApkCloneImporter {
             CharSequence label = pm.getApplicationLabel(info);
             String source = info.sourceDir;
             if (source == null) throw new IOException("APK path unavailable");
-            return store.importApk(
+
+            ApkCloneStore.CloneRecord record = store.importApk(
                     packageName,
                     label == null ? packageName : label.toString(),
                     new File(source)
             );
+
+            // Prepare the private runtime immediately after the APK is copied.
+            // This validates the APK, discovers a launchable activity, and creates
+            // the clone's isolated data/cache/files directories.
+            new CloneRuntime(context).prepare(record);
+
+            return record;
         } catch (PackageManager.NameNotFoundException e) {
             throw new IOException("Installed app not found", e);
         }
