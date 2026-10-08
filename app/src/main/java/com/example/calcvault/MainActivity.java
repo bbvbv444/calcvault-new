@@ -354,18 +354,18 @@ public class MainActivity extends Activity {
             return;
         }
 
-        UserHandle profile=findPrivateProfile();
-        if(profile!=null){
-            launchCopiedAppInProfile(record.packageName,profile);
+        try{
+            VirtualRuntimeCoordinator coordinator =
+                    new VirtualRuntimeCoordinator(this);
+            VirtualRuntimeCoordinator.Prepared prepared =
+                    coordinator.prepare(record);
+            new VirtualLaunchDispatcher(this).launch(prepared);
             return;
+        }catch(Exception virtualError){
+            toast(virtualError.getMessage()==null
+                    ? "Could not prepare the private copy"
+                    : virtualError.getMessage());
         }
-
-        new AlertDialog.Builder(this)
-            .setTitle("Set up Private Apps")
-            .setMessage("CalcVault will create a separate Android private profile for copied apps. Android will show its own setup and permission screens. Your original app stays in the normal profile.")
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Continue",(d,w)->provisionPrivateProfile(record.packageName))
-            .show();
     }
 
     private void provisionPrivateProfile(String packageName){
