@@ -629,22 +629,118 @@ public class MainActivity extends Activity {
         try{
             String originalName=queryDisplayName(source);
             String mime=getContentResolver().getType(source); if(mime==null)mime="application/octet-stream";
-            String name=humanMediaName(mime,originalName);
-            String safe=name.replaceAll("[^A-Za-z0-9._ -]","_");
+            if(mime.startsWith("image/")){
+                showImageNoteDialog(source,originalName,mime);
+                return;
+            }
+            savePrivateFileWithName(source,originalName,mime,null);
+        }catch(Exception e){toast("Could not save that file");}
+    }
+
+    private void showImageNoteDialog(Uri source,String originalName,String mime){
+        final EditText input=new EditText(this);
+        input.setHint("Example: School project");
+        input.setTextColor(fg);
+        input.setHintTextColor(muted);
+        input.setSingleLine(true);
+        input.setPadding(dp(12),dp(8),dp(12),dp(8));
+
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8),0,dp(8),0);
+        box.addView(input,new LinearLayout.LayoutParams(-1,dp(52)));
+
+        TextView count=label("0/15 words",12,muted,false);
+        box.addView(count,new LinearLayout.LayoutParams(-1,dp(32)));
+
+        input.addTextChangedListener(new android.text.TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int before,int countChanged){
+                int words=countWords(s.toString());
+                count.setText(words+"/15 words");
+                count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+            }
+            public void afterTextChanged(android.text.Editable e){}
+        });
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Name this image")
+            .setMessage("Add a short note. It will become the image name inside your private vault. Maximum 15 words.")
+            .setView(box)
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Save Image",null)
+            .create();
+
+        dialog.setOnShowListener(d->{
+            Button save=dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            save.setOnClickListener(v->{
+                String note=input.getText().toString().trim();
+                int words=countWords(note);
+                if(words==0){
+                    input.setError("Please add a note");
+                    return;
+                }
+                if(words>15){
+                    input.setError("Use 15 words or fewer");
+                    return;
+                }
+                savePrivateFileWithName(source,originalName,mime,note);
+                dialog.dismiss();
+            });
+        });
+        dialog.show();
+    }
+
+    private int countWords(String text){
+        String s=text==null? "":text.trim();
+        if(s.isEmpty())return 0;
+        return s.split("\\s+").length;
+    }
+
+    private void savePrivateFileWithName(Uri source,String originalName,String mime,String customName){
+        try{
+            String name=(customName==null||customName.trim().isEmpty())
+                ?humanMediaName(mime,originalName)
+                :customName.trim();
+
+            String ext=extensionForMime(mime,originalName);
+            String safeBase=name.replaceAll("[^A-Za-z0-9._ -]","_").trim();
+            if(safeBase.isEmpty())throw new IOException("Invalid name");
+
+            String safe=safeBase+(ext.isEmpty()?"":ext);
             File dir=new File(getFilesDir(),"vault_files"); if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create private folder");
             File noMedia=new File(dir,".nomedia"); if(!noMedia.exists())noMedia.createNewFile();
+
             File out=new File(dir,safe);
+            int copyNo=2;
+            while(out.exists()){
+                out=new File(dir,safeBase+" ("+copyNo+")"+ext);
+                copyNo++;
+            }
+
             InputStream in=getContentResolver().openInputStream(source); if(in==null)throw new IOException("Cannot read selected file");
-            FileOutputStream fos=new FileOutputStream(out);byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1)fos.write(buf,0,n);in.close();fos.close();
-            JSONObject meta=new JSONObject();meta.put("name",name);meta.put("mime",mime);meta.put("path",out.getAbsolutePath());
+            FileOutputStream fos=new FileOutputStream(out);
+            byte[] buf=new byte[8192];int n;
+            while((n=in.read(buf))!=-1)fos.write(buf,0,n);
+            in.close();fos.close();
+
+            String displayName=customName==null||customName.trim().isEmpty()
+                ?name
+                :customName.trim();
+
+            JSONObject meta=new JSONObject();
+            meta.put("name",displayName);
+            meta.put("mime",mime);
+            meta.put("path",out.getAbsolutePath());
             String raw=meta.toString();
             files.add(raw);saveLists();
             toast("Saved privately in CalcVault");
+
             if(mime.startsWith("image/")||mime.startsWith("video/")){
                 new AlertDialog.Builder(this).setTitle("Remove original from Gallery?")
                     .setMessage("CalcVault has safely stored a private copy. Remove the original from your Gallery so only the hidden copy remains?")
                     .setNegativeButton("Keep original",null)
-                    .setPositiveButton("Remove", (d,w)->removeOriginalAfterConfirm(source,raw))
+                    .setPositiveButton("Remove",(d,w)->removeOriginalAfterConfirm(source,raw))
                     .show();
             }
             if(unlocked)vault();
