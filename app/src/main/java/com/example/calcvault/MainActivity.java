@@ -476,17 +476,10 @@ public class MainActivity extends Activity {
                 recorder.release();
                 recorder=null;
                 if(recordingFile!=null&&recordingFile.exists()&&recordingFile.length()>0){
-                    JSONObject m=new JSONObject();
-                    m.put("name",recordingFile.getName());
-                    m.put("mime","audio/mp4");
-                    m.put("path",recordingFile.getAbsolutePath());
-                    files.add(m.toString());
-                    saveLists();
-                    toast("Private voice recording saved");
+                    File finishedRecording=recordingFile;
+                    recordingFile=null;
+                    showRecordedNoteDialog(finishedRecording,dialog);
                 }else throw new IOException("empty recording");
-                recordingFile=null;
-                dialog.dismiss();
-                if(unlocked)vault();
             }catch(Exception e){
                 if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
                 if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
@@ -625,19 +618,88 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showRecordedNoteDialog(File recordedFile, AlertDialog recorderDialog){
+        final EditText input=new EditText(this);
+        input.setHint("Example: Meeting voice note");
+        input.setTextColor(fg);
+        input.setHintTextColor(muted);
+        input.setSingleLine(true);
+        input.setPadding(dp(12),dp(8),dp(12),dp(8));
+
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8),0,dp(8),0);
+        box.addView(input,new LinearLayout.LayoutParams(-1,dp(52)));
+
+        TextView count=label("0/15 words",12,muted,false);
+        box.addView(count,new LinearLayout.LayoutParams(-1,dp(32)));
+
+        input.addTextChangedListener(new android.text.TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int before,int countChanged){
+                int words=countWords(s.toString());
+                count.setText(words+"/15 words");
+                count.setTextColor(words>15?Color.rgb(255,110,110):muted);
+            }
+            public void afterTextChanged(android.text.Editable e){}
+        });
+
+        AlertDialog nameDialog=new AlertDialog.Builder(this)
+            .setTitle("Name this voice note")
+            .setMessage("Add a short note. Maximum 15 words.")
+            .setView(box)
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Save",null)
+            .create();
+
+        nameDialog.setOnShowListener(d->nameDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String note=input.getText().toString().trim();
+            int words=countWords(note);
+            if(words==0){input.setError("Please add a note");return;}
+            if(words>15){input.setError("Use 15 words or fewer");return;}
+
+            try{
+                String base=note.replaceAll("[^A-Za-z0-9._ -]","_").trim();
+                if(base.isEmpty())throw new IOException("Invalid name");
+                String ext=".m4a";
+                File finalFile=new File(recordedFile.getParentFile(),base+ext);
+                int copyNo=2;
+                while(finalFile.exists()){
+                    finalFile=new File(recordedFile.getParentFile(),base+" ("+copyNo+")"+ext);
+                    copyNo++;
+                }
+                if(!recordedFile.renameTo(finalFile))throw new IOException("Could not rename recording");
+
+                JSONObject m=new JSONObject();
+                m.put("name",note);
+                m.put("mime","audio/mp4");
+                m.put("path",finalFile.getAbsolutePath());
+                files.add(m.toString());
+                saveLists();
+                toast("Private voice recording saved");
+                if(recorderDialog!=null)recorderDialog.dismiss();
+                if(unlocked)vault();
+                nameDialog.dismiss();
+            }catch(Exception e){
+                toast("Could not save recording");
+            }
+        }));
+        nameDialog.show();
+    }
+
     private void savePrivateFile(Uri source){
         try{
             String originalName=queryDisplayName(source);
             String mime=getContentResolver().getType(source); if(mime==null)mime="application/octet-stream";
-            if(mime.startsWith("image/")){
-                showImageNoteDialog(source,originalName,mime);
+            if(mime.startsWith("image/")||mime.startsWith("video/")||mime.startsWith("audio/")){
+                showMediaNoteDialog(source,originalName,mime);
                 return;
             }
             savePrivateFileWithName(source,originalName,mime,null);
         }catch(Exception e){toast("Could not save that file");}
     }
 
-    private void showImageNoteDialog(Uri source,String originalName,String mime){
+    private void showMediaNoteDialog(Uri source,String originalName,String mime){
         final EditText input=new EditText(this);
         input.setHint("Example: School project");
         input.setTextColor(fg);
@@ -664,11 +726,11 @@ public class MainActivity extends Activity {
         });
 
         AlertDialog dialog=new AlertDialog.Builder(this)
-            .setTitle("Name this image")
-            .setMessage("Add a short note. It will become the image name inside your private vault. Maximum 15 words.")
+            .setTitle("Name this media")
+            .setMessage("Add a short note. It will become the media name inside your private vault. Maximum 15 words.")
             .setView(box)
             .setNegativeButton("Cancel",null)
-            .setPositiveButton("Save Image",null)
+            .setPositiveButton("Save",null)
             .create();
 
         dialog.setOnShowListener(d->{
