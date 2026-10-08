@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.App" parent="android:Theme.Material">
+    <style name="Theme.App" parent="android:theme.Material">
         <item name="android:colorPrimary">@color/primary</item>
         <item name="android:colorAccent">@color/primary</item>
         <item name="android:colorBackground">@color/app_background</item>
@@ -19,5 +19,25 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+
+    <style name="Theme.App.Light" parent="android:style/Theme.Material.Light">
+        <item name="android:colorPrimary">@color/primary_light</item>
+        <item name="android:colorAccent">@color/primary_light</item>
+        <item name="android:colorBackground">@color/app_background_light</item>
+        <item name="android:windowBackground">@color/app_background_light</item>
+        <item name="android:alertDialogTheme">@style/Theme.App.Light.Dialog</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:navigationBarColor">@color/app_background_light</item>
+        <item name="android:statusBarColor">@color/app_background_light</item>
+    </style>
+
+    <style name="Theme.App.Light.Dialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">@color/primary_light</item>
+        <item name="android:colorBackground">@color/panel_background_light</item>
+        <item name="android:windowBackground">@color/panel_background_light</item>
+        <item name="android:textColorPrimary">@color/text_primary_light</item>
+        <item name="android:textColorSecondary">@color/text_secondary_light</item>
     </style>
 </resources>
