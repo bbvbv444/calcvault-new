@@ -128,7 +128,7 @@ public final class CloneRuntime {
             byte[] buffer=new byte[8192];
             while((entry=zin.getNextEntry())!=null){
                 String name=entry.getName();
-                if(entry.isDirectory() || !name.matches("classes([2-9][0-9]*|[0-9]+)?\\\\.dex")){
+                if(entry.isDirectory() || !name.matches("classes([2-9][0-9]*|[0-9]+)?\\.dex")){
                     continue;
                 }
                 File out=new File(dexRoot,new File(name).getName());
