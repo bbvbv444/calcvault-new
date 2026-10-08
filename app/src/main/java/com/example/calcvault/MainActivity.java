@@ -53,6 +53,15 @@ public class MainActivity extends Activity {
         if(!hasKey()) new Handler().postDelayed(this::createKey,300);
     }
 
+    @Override protected void onStop(){
+        super.onStop();
+        if(unlocked){
+            unlocked=false;
+            lockHandler.removeCallbacks(lockRunnable);
+            buildHome();
+        }
+    }
+
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
         super.onRequestPermissionsResult(requestCode,permissions,grantResults);
         if(requestCode==REQUEST_AUDIO){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)recordAudio();else toast("Microphone permission is needed to record audio");}else if(requestCode==PICK_SCAN){if(grantResults.length>0&&grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)openScannerCamera();else toast("Camera permission is needed to scan documents");}
