@@ -281,24 +281,103 @@ public class MainActivity extends Activity {
     private void recordAudio(){
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
             new AlertDialog.Builder(this).setTitle("Microphone permission")
-                .setMessage("CalcVault needs microphone access only when you choose Record audio, so it can save your recording privately.")
+                .setMessage("CalcVault needs microphone access only when you choose Record audio. The recording is saved privately inside CalcVault.")
                 .setNegativeButton("Cancel",null)
                 .setPositiveButton("Allow", (d,w)->requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO},REQUEST_AUDIO))
                 .show();
             return;
         }
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
-        TextView status=label("Ready to record",16,fg,true);Button start=button("Start recording");Button stop=button("Stop and save");stop.setEnabled(false);
-        box.addView(status);box.addView(start);box.addView(stop);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Private Audio Recorder").setView(box).setNegativeButton("Close",(which,w)->{try{if(recorder!=null){recorder.stop();recorder.release();recorder=null;}}catch(Exception ignored){}if(recordingFile!=null)recordingFile.delete();recordingFile=null;}).create();dialog.show();
-        start.setOnClickListener(v->{try{
-            File dir=new File(getFilesDir(),"vault_files");if(!dir.exists())dir.mkdirs();
-            File nm=new File(dir,nextHumanFileName("Private Audio Recording",".m4a"));
-            recordingFile=nm;android.media.MediaRecorder r=new android.media.MediaRecorder();recorder=r;
-            r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);r.setOutputFile(nm.getAbsolutePath());r.prepare();r.start();
-            status.setText("Recording…");start.setEnabled(false);stop.setEnabled(true);
-        }catch(Exception e){toast("Could not start recording");}});
-        stop.setOnClickListener(v->{try{if(recorder!=null){recorder.stop();recorder.release();recorder=null;}if(recordingFile!=null&&recordingFile.exists()){JSONObject m=new JSONObject();m.put("name",recordingFile.getName());m.put("mime","audio/mp4");m.put("path",recordingFile.getAbsolutePath());files.add(m.toString());saveLists();toast("Private audio saved");}recordingFile=null;dialog.dismiss();if(unlocked)vault();}catch(Exception e){toast("Could not save recording");}});
+
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView status=label("Ready to record",16,fg,true);
+        Button start=button("Start recording");
+        Button stop=button("Stop and save");
+        stop.setEnabled(false);
+        box.addView(status);
+        box.addView(start);
+        box.addView(stop);
+
+        final boolean[] recording={false};
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Private Audio Recorder")
+            .setView(box)
+            .setNegativeButton("Close",(which,w)->{
+                if(recorder!=null){
+                    try{
+                        if(recording[0]) recorder.stop();
+                    }catch(Exception ignored){}
+                    try{recorder.release();}catch(Exception ignored){}
+                    recorder=null;
+                }
+                if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
+                recordingFile=null;
+                recording[0]=false;
+            }).create();
+        dialog.show();
+
+        start.setOnClickListener(v->{
+            if(recording[0])return;
+            try{
+                File dir=new File(getFilesDir(),"vault_files");
+                if(!dir.exists()&&!dir.mkdirs())throw new IOException("folder");
+                File nm=new File(dir,nextHumanFileName("Private Voice Recording",".m4a"));
+                recordingFile=nm;
+
+                android.media.MediaRecorder r=new android.media.MediaRecorder();
+                recorder=r;
+                r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);
+                r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);
+                r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);
+                if(Build.VERSION.SDK_INT>=29)r.setPrivacySensitive(true);
+                r.setOutputFile(nm.getAbsolutePath());
+                r.prepare();
+                r.start();
+
+                recording[0]=true;
+                status.setText("Recording…");
+                start.setEnabled(false);
+                stop.setEnabled(true);
+            }catch(Exception e){
+                if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
+                if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
+                recordingFile=null;
+                recording[0]=false;
+                toast("Could not start recording");
+            }
+        });
+
+        stop.setOnClickListener(v->{
+            if(!recording[0]||recorder==null)return;
+            try{
+                recorder.stop();
+                recorder.release();
+                recorder=null;
+                recording[0]=false;
+
+                if(recordingFile!=null&&recordingFile.exists()&&recordingFile.length()>0){
+                    JSONObject m=new JSONObject();
+                    m.put("name",recordingFile.getName());
+                    m.put("mime","audio/mp4");
+                    m.put("path",recordingFile.getAbsolutePath());
+                    files.add(m.toString());
+                    saveLists();
+                    toast("Private voice recording saved");
+                }else{
+                    throw new IOException("empty recording");
+                }
+
+                recordingFile=null;
+                dialog.dismiss();
+                if(unlocked)vault();
+            }catch(Exception e){
+                if(recorder!=null){try{recorder.release();}catch(Exception ignored){}recorder=null;}
+                if(recordingFile!=null&&recordingFile.exists())recordingFile.delete();
+                recordingFile=null;
+                recording[0]=false;
+                toast("Could not save recording");
+            }
+        });
     }
 
     private void scanDocument(){
@@ -463,7 +542,7 @@ public class MainActivity extends Activity {
         String base;
         if(mime!=null&&mime.startsWith("image/")) base="Private Photo";
         else if(mime!=null&&mime.startsWith("video/")) base="Private Video";
-        else if(mime!=null&&mime.startsWith("audio/")) base="Private Audio Recording";
+        else if(mime!=null&&mime.startsWith("audio/")) base=(mime.equalsIgnoreCase("audio/mp4")||mime.equalsIgnoreCase("audio/m4a"))?"Private Voice Recording":"Private Audio";
         else if("application/pdf".equalsIgnoreCase(mime)) base="Private Document";
         else base="Private File";
         return nextHumanFileName(base,ext);
