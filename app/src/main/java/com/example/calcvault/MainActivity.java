@@ -230,12 +230,54 @@ public class MainActivity extends Activity {
             if(fileSection){
                 try{JSONObject m=new JSONObject(s);String mime=m.optString("mime","");if(mime.startsWith("image/")||mime.startsWith("video/")){Button restore=button("Restore");restore.setTextSize(12);restore.setOnClickListener(x->restorePrivateMedia(s));row.addView(restore,new LinearLayout.LayoutParams(dp(82),dp(44)));}}catch(Exception ignored){}
             }
-            if(title.equals("Private Contacts")){Button del=button("Delete");del.setTextSize(12);del.setOnClickListener(x->{contacts.remove(s);favorites.remove(itemKey("contact",s));saveLists();renderItems(v,query);});row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));}
+            if(fileSection){
+                try{
+                    JSONObject m=new JSONObject(s);String mime=m.optString("mime","");
+                    if(mime.startsWith("image/")||mime.startsWith("video/")){
+                        Button restore=button("Restore");restore.setTextSize(12);
+                        restore.setOnClickListener(x->restorePrivateMedia(s));
+                        row.addView(restore,new LinearLayout.LayoutParams(dp(82),dp(44)));
+                    }
+                }catch(Exception ignored){}
+                Button del=button("Delete");del.setTextSize(12);
+                del.setOnClickListener(x->confirmDeleteVaultItem(title,s,v,query));
+                row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));
+            }
+            if(title.equals("Private Contacts")){
+                Button del=button("Delete");del.setTextSize(12);
+                del.setOnClickListener(x->{contacts.remove(s);favorites.remove(itemKey("contact",s));saveLists();renderItems(v,query);});
+                row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));
+            }
+            if(title.equals("Notes")||title.equals("Links")){
+                Button del=button("Delete");del.setTextSize(12);
+                del.setOnClickListener(x->confirmDeleteVaultItem(title,s,v,query));
+                row.addView(del,new LinearLayout.LayoutParams(dp(72),dp(44)));
+            }
             v.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }
         if(!any)v.addView(label(list.isEmpty()?"Nothing saved yet":"No matching items",14,muted,false));
     }
 
+    private void confirmDeleteVaultItem(String title,String raw,LinearLayout v,String query){
+        String shown=title.equals("Files / Media")?fileName(raw):raw;
+        new AlertDialog.Builder(this).setTitle("Delete permanently?")
+            .setMessage("This will completely remove the item from CalcVault. This cannot be undone.")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Delete",(d,w)->{
+                try{
+                    if(title.equals("Files / Media")){
+                        JSONObject m=new JSONObject(raw);String path=m.optString("path","");
+                        if(!path.isEmpty()){File f=new File(path);if(f.exists())f.delete();}
+                        files.remove(raw);favorites.remove(itemKey("file",raw));
+                    }else if(title.equals("Notes")){
+                        notes.remove(raw);favorites.remove(itemKey("note",raw));
+                    }else if(title.equals("Links")){
+                        links.remove(raw);favorites.remove(itemKey("link",raw));
+                    }
+                    saveLists();renderItems(v,query);toast("Deleted permanently");
+                }catch(Exception e){toast("Could not delete item");}
+            }).show();
+    }
     private void addFavoriteItems(LinearLayout v,String query){
         boolean any=false;
         for(String s:notes)if(isFavorite("note",s)&&matches(s,query)){addFavoriteRow(v,"Note",s,query);any=true;}
@@ -317,7 +359,8 @@ public class MainActivity extends Activity {
                 r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);
                 r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);
                 r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);
-                if(Build.VERSION.SDK_INT>=29)r.setPrivacySensitive(true);
+                r.setAudioSamplingRate(44100);
+                r.setAudioEncodingBitRate(128000);
                 r.setOutputFile(nm.getAbsolutePath());r.prepare();r.start();
                 recording[0]=true;status.setText("Recording…");start.setEnabled(false);stop.setEnabled(true);
             }catch(Exception e){
