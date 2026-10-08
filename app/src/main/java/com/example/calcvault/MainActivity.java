@@ -1065,7 +1065,7 @@ public class MainActivity extends Activity {
 
     private void hideCalcVaultLauncher(){
         try{
-            ComponentName alias=new ComponentName(this,CalcVaultLauncher.class);
+            ComponentName alias=new ComponentName(this,getPackageName()+".CalcVaultLauncher");
             getPackageManager().setComponentEnabledSetting(alias,PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
             toast("CalcVault launcher icon hidden");
         }catch(Exception e){
