@@ -3,20 +3,29 @@ package com.example.calcvault;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import dalvik.system.DexClassLoader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public final class CloneRuntime {
     public static final class PreparedRuntime {
         public final ApkCloneStore.CloneRecord clone;
         public final String launchActivity;
+        public final String applicationClass;
         public final File runtimeRoot;
-        public PreparedRuntime(ApkCloneStore.CloneRecord clone,String launchActivity,File runtimeRoot){
+        public final File dexRoot;
+        public final DexClassLoader classLoader;
+
+        PreparedRuntime(ApkCloneStore.CloneRecord clone,String launchActivity,String applicationClass,
+                        File runtimeRoot,File dexRoot,DexClassLoader classLoader){
             this.clone=clone;
             this.launchActivity=launchActivity;
+            this.applicationClass=applicationClass;
             this.runtimeRoot=runtimeRoot;
+            this.dexRoot=dexRoot;
+            this.classLoader=classLoader;
         }
     }
 
@@ -40,7 +49,7 @@ public final class CloneRuntime {
             throw new IOException("Private APK could not be inspected");
         }
 
-        String launchActivity=findLaunchActivity(pm,apk.getAbsolutePath());
+        String launchActivity=findLaunchActivity(info);
         if(launchActivity==null || launchActivity.isEmpty()){
             throw new IOException("No launchable activity found");
         }
@@ -49,39 +58,97 @@ public final class CloneRuntime {
         File data=new File(root,"data");
         File cache=new File(root,"cache");
         File files=new File(root,"files");
-        if(!root.exists() && !root.mkdirs()) throw new IOException("Could not create runtime folder");
-        if(!data.exists() && !data.mkdirs()) throw new IOException("Could not create runtime data folder");
-        if(!cache.exists() && !cache.mkdirs()) throw new IOException("Could not create runtime cache folder");
-        if(!files.exists() && !files.mkdirs()) throw new IOException("Could not create runtime files folder");
+        File dexRoot=new File(root,"dex");
+        makeDir(root,"runtime folder");
+        makeDir(data,"runtime data folder");
+        makeDir(cache,"runtime cache folder");
+        makeDir(files,"runtime files folder");
+        makeDir(dexRoot,"runtime dex folder");
+
+        extractDexFiles(apk,dexRoot);
+
+        DexClassLoader loader=new DexClassLoader(
+                apk.getAbsolutePath(),
+                dexRoot.getAbsolutePath(),
+                null,
+                context.getClassLoader()
+        );
+
+        String applicationClass=info.applicationInfo.className;
+        if(applicationClass==null || applicationClass.trim().isEmpty()){
+            applicationClass="android.app.Application";
+        }
+
+        // Compatibility probe only: load the clone's Application class without
+        // initializing it. This does not start or modify the original app.
+        try{
+            Class.forName(applicationClass,false,loader);
+        }catch(Throwable e){
+            throw new IOException("Clone classes could not be loaded: "+e.getClass().getSimpleName(),e);
+        }
 
         String metadata="{\n"
                 +"  \"packageName\": \""+escape(clone.packageName)+"\",\n"
                 +"  \"label\": \""+escape(clone.label)+"\",\n"
                 +"  \"launchActivity\": \""+escape(launchActivity)+"\",\n"
+                +"  \"applicationClass\": \""+escape(applicationClass)+"\",\n"
                 +"  \"preparedAt\": "+System.currentTimeMillis()+"\n"
                 +"}\n";
         write(new File(root,"runtime.json"),metadata);
-        write(new File(root,"READY"),"prepared\\n");
+        write(new File(root,"READY"),"prepared\n");
 
-        return new PreparedRuntime(clone,launchActivity,root);
+        return new PreparedRuntime(clone,launchActivity,applicationClass,root,dexRoot,loader);
     }
 
-    private String findLaunchActivity(PackageManager pm,String apkPath){
-        try{
-            android.content.pm.PackageInfo info=pm.getPackageArchiveInfo(apkPath,PackageManager.GET_ACTIVITIES);
-            if(info!=null && info.activities!=null){
-                for(ActivityInfo a:info.activities){
-                    if(a==null || a.name==null)continue;
-                    if(a.exported)return a.name;
-                }
+    public String probe(ApkCloneStore.CloneRecord clone) throws IOException {
+        PreparedRuntime runtime=prepare(clone);
+        return "Runtime prepared successfully for "+runtime.clone.label+
+                ". Launch activity: "+runtime.launchActivity;
+    }
+
+    private String findLaunchActivity(android.content.pm.PackageInfo info){
+        if(info.activities!=null){
+            for(ActivityInfo a:info.activities){
+                if(a==null || a.name==null)continue;
+                if(a.exported)return a.name;
             }
-        }catch(Exception ignored){}
+        }
         return null;
+    }
+
+    private void extractDexFiles(File apk,File dexRoot)throws IOException{
+        File[] existing=dexRoot.listFiles();
+        if(existing!=null){
+            for(File f:existing)if(f.isFile())f.delete();
+        }
+
+        boolean found=false;
+        try(ZipInputStream zin=new ZipInputStream(new BufferedInputStream(new FileInputStream(apk)))){
+            ZipEntry entry;
+            byte[] buffer=new byte[8192];
+            while((entry=zin.getNextEntry())!=null){
+                String name=entry.getName();
+                if(entry.isDirectory() || !name.matches("classes([2-9][0-9]*|[0-9]+)?\\\\.dex")){
+                    continue;
+                }
+                File out=new File(dexRoot,new File(name).getName());
+                try(FileOutputStream fos=new FileOutputStream(out)){
+                    int n;
+                    while((n=zin.read(buffer))!=-1)fos.write(buffer,0,n);
+                }
+                found=true;
+            }
+        }
+        if(!found)throw new IOException("Clone APK contains no dex code");
+    }
+
+    private static void makeDir(File dir,String what)throws IOException{
+        if(!dir.exists() && !dir.mkdirs())throw new IOException("Could not create "+what);
     }
 
     private static String escape(String s){
         if(s==null)return "";
-        return s.replace("\\","\\\\").replace("\"","\\\"");
+        return s.replace("\\\\","\\\\\\\\").replace("\"","\\\"");
     }
 
     private static void write(File file,String text)throws IOException{
