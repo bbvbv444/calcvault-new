@@ -1,6 +1,7 @@
 package com.example.calcvault;
 
 import android.app.*;
+import android.app.admin.DevicePolicyManager;
 import android.content.*;
 import android.graphics.Color;
 import android.graphics.BitmapFactory;
@@ -13,6 +14,7 @@ import android.text.method.PasswordTransformationMethod;
 import android.text.method.HideReturnsTransformationMethod;
 import android.view.*;
 import android.widget.*;
+import android.content.pm.PackageManager;
 import java.io.*;
 import java.util.zip.*;
 import java.nio.charset.StandardCharsets;
@@ -1010,108 +1012,153 @@ public class MainActivity extends Activity {
         Button back=button("Back to Vault");
         back.setOnClickListener(v->vault());
         box.addView(back,new LinearLayout.LayoutParams(-1,dp(48)));
-        TextView info=label("Android-supported controls only. CalcVault can hide its own launcher icon. Other apps cannot be hidden by a normal app.",14,muted,false);
-        info.setPadding(dp(4),dp(4),dp(4),dp(12));
-        box.addView(info);
-        LinearLayout self=new LinearLayout(this);self.setOrientation(LinearLayout.VERTICAL);self.setPadding(dp(10),dp(10),dp(10),dp(10));self.setBackgroundColor(panel);
-        self.addView(label("CalcVault",17,fg,true));
-        int launcherState=getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"));\n        boolean hidden=launcherState==PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-        Button selfButton=button(hidden?"Restore CalcVault launcher icon":"Hide CalcVault launcher icon");
-        self.addView(label(hidden?"The launcher icon is currently hidden. Tap the recovery notification to reopen CalcVault.":"This removes only the launcher icon. CalcVault itself remains installed and usable.",13,muted,false));
-        self.addView(selfButton,new LinearLayout.LayoutParams(-1,dp(48)));
-        selfButton.setOnClickListener(v->{ if(hidden)showCalcVaultLauncher(); else requestHideCalcVaultLauncher(); });
-        box.addView(self,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView appsTitle=label("Installed apps",18,fg,true);appsTitle.setPadding(0,dp(18),0,dp(6));box.addView(appsTitle);
-        EditText search=new EditText(this);search.setHint("Search apps");search.setSingleLine(true);box.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
-        ScrollView scroll=new ScrollView(this);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list,new ScrollView.LayoutParams(-1,-2));box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        Runnable render=()->renderInstalledApps(list,search.getText().toString());
-        search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){render.run();}public void afterTextChanged(android.text.Editable e){}});
+        box.addView(label("Private App Space",18,fg,true));
+        box.addView(label("CalcVault can create an Android-managed private copy of an app. Android keeps the copy in a separate profile.",14,muted,false));
+
+        UserHandle profile=findPrivateProfile();
+        if(profile==null){
+            box.addView(label("Choose an installed app below, then tap Clone. Android will show its own setup and consent screens.",13,muted,false));
+        }else{
+            box.addView(label("Private App Space is ready. Cloned apps are separate from your normal app data.",13,muted,false));
+        }
+
+        TextView appsTitle=label(profile==null?"Choose an app to clone":"Installed apps",18,fg,true);
+        appsTitle.setPadding(0,dp(18),0,dp(6));
+        box.addView(appsTitle);
+
+        EditText search=new EditText(this);
+        search.setHint("Search apps");
+        search.setSingleLine(true);
+        box.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
+
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout list=new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(list,new ScrollView.LayoutParams(-1,-2));
+        box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        Runnable render=()->renderPrivateAppChoices(list,search.getText().toString(),profile);
+        search.addTextChangedListener(new android.text.TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int b,int c){render.run();}
+            public void afterTextChanged(android.text.Editable e){}
+        });
         render.run();
         setContentView(box);
     }
 
-    private void renderInstalledApps(LinearLayout list,String query){
+    private UserHandle findPrivateProfile(){
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            for(UserHandle u:la.getProfiles()){
+                if(!UserHandle.myUserHandle().equals(u))return u;
+            }
+        }catch(Exception ignored){}
+        return null;
+    }
+
+    private void renderPrivateAppChoices(LinearLayout list,String query,UserHandle profile){
         list.removeAllViews();
         String q=query==null?"":query.trim().toLowerCase(Locale.US);
         PackageManager pm=getPackageManager();
-        Intent launcherIntent=new Intent(Intent.ACTION_MAIN,null);launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        Intent launcherIntent=new Intent(Intent.ACTION_MAIN,null);
+        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         List<android.content.pm.ResolveInfo> apps=pm.queryIntentActivities(launcherIntent,PackageManager.MATCH_ALL);
-        Collections.sort(apps,(a,b)->{
-            String an=String.valueOf(a.loadLabel(pm)),bn=String.valueOf(b.loadLabel(pm));
-            return an.compareToIgnoreCase(bn);
-        });
+        Collections.sort(apps,(a,b)->String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm))));
         int shown=0;
+
         for(android.content.pm.ResolveInfo ri:apps){
             String pkg=ri.activityInfo.packageName;
             String name=String.valueOf(ri.loadLabel(pm));
             if(pkg.equals(getPackageName()))continue;
             if(!q.isEmpty()&&!name.toLowerCase(Locale.US).contains(q)&&!pkg.toLowerCase(Locale.US).contains(q))continue;
+
             shown++;
-            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(dp(4),dp(8),dp(4),dp(8));
+            boolean cloned=isAppClonedInProfile(pkg,profile);
+            LinearLayout row=new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(8),dp(8),dp(8),dp(8));
             row.setBackgroundColor(panel);
             row.addView(label(name,16,fg,true));
             row.addView(label(pkg,11,muted,false));
-            LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-            Button open=button("Open");Button settings=button("App info");
-            open.setOnClickListener(v->{try{Intent i=pm.getLaunchIntentForPackage(pkg);if(i!=null)startActivity(i);else toast("Android did not provide a launch action for this app");}catch(Exception e){toast("Could not open app");}});
-            settings.setOnClickListener(v->{try{Intent i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+pkg));startActivity(i);}catch(Exception e){toast("Could not open app settings");}});
-            actions.addView(open,new LinearLayout.LayoutParams(0,dp(44),1));actions.addView(settings,new LinearLayout.LayoutParams(0,dp(44),1));
+
+            LinearLayout actions=new LinearLayout(this);
+            actions.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+            if(cloned){
+                Button launch=button("Launch Private Copy");
+                launch.setOnClickListener(v->launchPrivateCopy(pkg,profile));
+                actions.addView(launch,new LinearLayout.LayoutParams(0,dp(44),1));
+            }else{
+                Button clone=button(profile==null?"Clone":"Private copy unavailable");
+                if(profile==null){
+                    clone.setOnClickListener(v->setupPrivateProfileFor(pkg));
+                }else{
+                    clone.setEnabled(false);
+                    clone.setAlpha(0.6f);
+                }
+                actions.addView(clone,new LinearLayout.LayoutParams(0,dp(44),1));
+            }
             row.addView(actions);
             list.addView(row,new LinearLayout.LayoutParams(-1,-2));
-            Space gap=new Space(this);list.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
+            Space gap=new Space(this);
+            list.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
         }
         if(shown==0)list.addView(label("No matching launchable apps found.",14,muted,false));
     }
 
-    private void requestHideCalcVaultLauncher(){
-        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
-            new AlertDialog.Builder(this).setTitle("Notification permission")
-                .setMessage("Android requires notification permission so CalcVault can give you a recovery notification after its launcher icon is hidden.")
-                .setNegativeButton("Cancel",null)
-                .setPositiveButton("Allow",(d,w)->{pendingHideLauncher=true;requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},REQUEST_NOTIFICATIONS);})
-                .show();
+    private boolean isAppClonedInProfile(String pkg,UserHandle profile){
+        if(profile==null)return false;
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            return !la.getActivityList(pkg,profile).isEmpty();
+        }catch(Exception e){return false;}
+    }
+
+    private void setupPrivateProfileFor(String pkg){
+        if(Build.VERSION.SDK_INT<28){
+            toast("This Android version cannot create private app copies with the required Android API");
             return;
         }
-        hideCalcVaultLauncher();
-    }
-
-    private void hideCalcVaultLauncher(){
+        DevicePolicyManager dpm=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
         try{
-            PackageManager pm=getPackageManager();
-            pm.setComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"),PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
-            showHiddenLauncherRecoveryNotification();
-            toast("CalcVault launcher icon hidden");
-            buildHome();
-        }catch(Exception e){toast("Android could not hide the launcher icon");}
-    }
-
-    private void showCalcVaultLauncher(){
-        try{
-            PackageManager pm=getPackageManager();
-            pm.setComponentEnabledSetting(new ComponentName(this,"com.example.calcvault.CalcVaultLauncher"),PackageManager.COMPONENT_ENABLED_STATE_ENABLED,PackageManager.DONT_KILL_APP);
-            cancelHiddenLauncherRecoveryNotification();
-            toast("CalcVault launcher icon restored");
-            buildHome();
-        }catch(Exception e){toast("Could not restore the launcher icon");}
-    }
-
-    private void showHiddenLauncherRecoveryNotification(){
-        try{
-            if(Build.VERSION.SDK_INT>=26){
-                NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-                nm.createNotificationChannel(new NotificationChannel("calcvault_recovery","CalcVault recovery",NotificationManager.IMPORTANCE_LOW));
+            if(!dpm.isProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE)){
+                new AlertDialog.Builder(this)
+                    .setTitle("Private App Space unavailable")
+                    .setMessage("Android is not allowing a managed private profile on this phone right now. Nothing was changed.")
+                    .setPositiveButton("OK",null).show();
+                return;
             }
-            Intent open=new Intent(this,MainActivity.class);open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent pi=PendingIntent.getActivity(this,901,open,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=23?PendingIntent.FLAG_IMMUTABLE:0));
-            Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,"calcvault_recovery"):new Notification.Builder(this);
-            b.setSmallIcon(android.R.drawable.ic_menu_manage).setContentTitle("CalcVault launcher hidden").setContentText("Tap here to reopen CalcVault.").setOngoing(true).setContentIntent(pi).setAutoCancel(false);
-            if(Build.VERSION.SDK_INT<33||checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(901,b.build());
-        }catch(Exception ignored){}
+            Intent i=new Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE);
+            i.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,
+                    new ComponentName(this,AppSpaceAdminReceiver.class));
+            Bundle extras=new Bundle();
+            extras.putString("calcvault_clone_package",pkg);
+            i.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE,extras);
+            startActivityForResult(i,910);
+        }catch(Exception e){
+            new AlertDialog.Builder(this)
+                .setTitle("Could not start Private App Space")
+                .setMessage("Android could not start the private profile setup. Your existing apps and CalcVault data were not changed.")
+                .setPositiveButton("OK",null).show();
+        }
     }
 
-    private void cancelHiddenLauncherRecoveryNotification(){
-        try{((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).cancel(901);}catch(Exception ignored){}
+    private void refreshPrivateAppsAfterProvisioning(){
+        new Handler().postDelayed(()->{
+            if(unlocked)appHider();
+        },1200);
+    }
+
+    private void launchPrivateCopy(String pkg,UserHandle profile){
+        try{
+            android.content.pm.LauncherApps la=(android.content.pm.LauncherApps)getSystemService(LAUNCHER_APPS_SERVICE);
+            List<android.content.pm.LauncherActivityInfo> list=la.getActivityList(pkg,profile);
+            if(list.isEmpty()){toast("Private copy is not available");return;}
+            la.startMainActivity(list.get(0).getComponentName(),profile,null,null);
+        }catch(Exception e){
+            toast("Android could not launch the private copy");
+        }
     }
 
     private void scientific(){
