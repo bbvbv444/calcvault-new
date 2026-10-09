@@ -16,6 +16,20 @@ The project describes itself as a no-root virtualization engine. It is source co
 
 The candidate has crash-reporting code that calls `BlackBoxCore.sendLogs(...)` from a global uncaught-exception handler. Before embedding this code in CalcVault, the logging/reporting path and all network destinations must be reviewed and disabled unless explicitly approved. Do not include this candidate as-is in a user-facing build.
 
+## Decision from the next engine-source check
+
+The product name “Hider No Root” refers to an end-user app, not a verified developer SDK that CalcVault can call. I did not verify an official public source repository or embeddable engine package for that exact product, so CalcVault must not pretend that app itself can be dropped into the project as a library.
+
+The BlackBox family remains a possible source-based route, but its core requires a conventional Android Gradle build, Java/Kotlin and AIDL integration, native NDK libraries, and framework hooks. A similarly named Maven artifact is not proof of a compatible app-virtualization engine; package metadata and implementation must match before use. Do not add a random AAR based only on its name.
+
+### Gate before engine code is imported
+
+- Identify a specific engine source revision and confirm its license and all network/reporting behavior.
+- Confirm whether the current CodeAssist project can package its AIDL and native libraries. If it cannot, the project needs a separately planned Gradle-based integration/build path before engine source is imported.
+- Keep engine integration isolated from the existing calculator/vault features.
+- Do not turn on any device-spoofing, hidden-hook, or anti-detection extras merely to make the first harmless test app launch.
+- First acceptance test: a harmless test APK displays its real first screen inside CalcVault; basic interaction works; its data stays separate; deleting the virtual copy removes only that copy; the original app remains installed.
+
 ## Required integration sequence
 
 1. Confirm CodeAssist can build and package the candidate engine's Java/AIDL and JNI libraries in this project format, or use a verified compatible prebuilt AAR whose source and license can be audited.
