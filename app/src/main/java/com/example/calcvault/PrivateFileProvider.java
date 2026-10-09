@@ -15,6 +15,7 @@ public class PrivateFileProvider extends ContentProvider {
 
     @Override public String getType(Uri uri){
         File f=fileFor(uri); String n=f.getName().toLowerCase();
+        if(n.endsWith(".apk"))return "application/vnd.android.package-archive";
         if(n.endsWith(".jpg")||n.endsWith(".jpeg"))return "image/jpeg";
         if(n.endsWith(".png"))return "image/png";
         if(n.endsWith(".webp"))return "image/webp";
@@ -54,12 +55,20 @@ public class PrivateFileProvider extends ContentProvider {
         if(path==null)throw new IllegalArgumentException("Missing file");
         String clean=path.startsWith("/")?path.substring(1):path;
         File base;
-        if(clean.startsWith("file/"))base=new File(getContext().getFilesDir(),"vault_files");
-        else if(clean.startsWith("backup/"))base=new File(getContext().getFilesDir(),"vault_backups");
-        else throw new IllegalArgumentException("Invalid path");
         String name=uri.getLastPathSegment();
         if(name==null||name.contains("..")||name.contains("/"))throw new IllegalArgumentException("Invalid file");
-        File f=new File(base,name);
+        File f;
+        if(clean.startsWith("clone/")){
+            String[] parts=clean.split("/");
+            if(parts.length!=3||!"base.apk".equals(parts[2])||!parts[1].matches("[A-Fa-f0-9-]{20,}"))throw new IllegalArgumentException("Invalid clone path");
+            base=new File(new File(getContext().getFilesDir(),"app_clones"),parts[1]);
+            f=new File(base,"base.apk");
+        }else{
+            if(clean.startsWith("file/"))base=new File(getContext().getFilesDir(),"vault_files");
+            else if(clean.startsWith("backup/"))base=new File(getContext().getFilesDir(),"vault_backups");
+            else throw new IllegalArgumentException("Invalid path");
+            f=new File(base,name);
+        }
         try {
             if(!f.getCanonicalPath().startsWith(base.getCanonicalPath()+File.separator)) {
                 throw new IllegalArgumentException("Invalid file");
