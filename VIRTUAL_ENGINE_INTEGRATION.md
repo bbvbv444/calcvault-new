@@ -97,3 +97,12 @@ Downloaded and inspected the workflow artifact without adding it to CalcVault. T
 - The current CalcVault CodeAssist project declares Java 8 and uses app/module.toml; this AAR was built with JDK 17/SDK 35 and may require Kotlin/AndroidX dependencies and manifest/component wiring not yet present in CalcVault.
 
 **Decision: do not integrate this raw AAR yet.** Keep it as an isolated candidate and do not replace the current runtime or merge its manifest wholesale. Next, inspect its build metadata and source initialization path to identify the smallest safe integration surface, and test whether the current project can support that surface. A real on-device test with a harmless APK remains mandatory before claiming clone functionality. The original app must remain installed during testing.
+
+
+### Initialization and dependency audit follow-up
+
+The pinned Pcore source shows a deeper host-app requirement: its sample app defines a custom `Application` class whose `attachBaseContext()` calls `PrismSpaceCore` lifecycle hooks and `AppManager`, while `onCreate()` pre-warms the engine. The facade's `initEngine()` alone is not the complete setup. CalcVault would need an audited equivalent startup sequence and the engine's proxy components and internal services, while preserving CalcVault's existing Application behavior. Blindly adding the AAR is not enough.
+
+The Pcore module is an Android library using Kotlin, Android AIDL, NDK build integration, Java 17/Kotlin 17, and project modules `:black-reflection` and `:compiler`, plus coroutines, AppCompat, TOML parsing, and FreeReflection. These are additional compatibility/build requirements beyond simply copying the AAR into a `libs` folder. Its source also installs crash-monitoring and exception-handling helpers during `PrismSpaceCore` class loading; those code paths need review before enabling it in the host app.
+
+**Next technical gate:** determine whether CalcVault's current CodeAssist `app/module.toml` project can safely adopt a Gradle-based Kotlin/AIDL/JNI library and required Application/manifest setup without disrupting vault features. Until that is verified, do not add the AAR to the app or change existing runtime code.
