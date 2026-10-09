@@ -354,17 +354,37 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // A copied APK cannot be launched as a normal Android Activity merely
-        // by loading its class. Use Android's managed/private profile instead.
-        // The first app is installed into that profile by AppSpaceAdminReceiver
-        // during profile provisioning, then launched by Android itself.
-        UserHandle profile=findPrivateProfile();
-        if(profile==null){
-            provisionPrivateProfile(record.packageName);
+        File apk=new File(record.apkPath==null?"":record.apkPath);
+        if(!apk.isFile()){
+            toast("The saved APK file is missing. Import this app again.");
             return;
         }
 
-        launchCopiedAppInProfile(record.packageName,profile);
+        // Android does not let CalcVault directly run another app's Activity
+        // from a stored APK. Hand the saved APK to Android's package installer.
+        // This installs it as a normal Android app; Android may ask for approval.
+        if(Build.VERSION.SDK_INT>=26&&!getPackageManager().canRequestPackageInstalls()){
+            try{
+                Intent settings=new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:"+getPackageName()));
+                startActivity(settings);
+                toast("Allow CalcVault to install APK files, then tap Open Copy again");
+            }catch(Exception e){
+                toast("Enable APK installs for CalcVault in Android settings");
+            }
+            return;
+        }
+
+        try{
+            Uri apkUri=Uri.parse("content://com.example.calcvault.privatefiles/clone/"+record.id+"/base.apk");
+            Intent install=new Intent(Intent.ACTION_INSTALL_PACKAGE);
+            install.setDataAndType(apkUri,"application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            install.putExtra(Intent.EXTRA_RETURN_RESULT,true);
+            startActivityForResult(install,915);
+        }catch(Exception e){
+            toast("Android could not open the APK installer");
+        }
     }
 
     private void provisionPrivateProfile(String packageName){
