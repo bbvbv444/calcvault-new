@@ -46,6 +46,12 @@ PrismSpace is a more recent research project with a separate `Pcore` Android lib
 
 **Decision: promising for a separate build experiment, not ready to copy into CalcVault.** It is not a prebuilt AAR, it is a full research codebase with substantial AIDL/native/framework work, and CalcVault currently uses CodeAssist's `app/module.toml` setup with Java 8. The host app also declares a Firebase Crashlytics dependency, which must be reviewed for data collection before reusing any of this code. I have not verified a successful clean build or a real clone launch from PrismSpace, and have not imported its code into CalcVault.
 
+### CI/build-output check (follow-up)
+
+I inspected PrismSpace's current `.github/workflows/android.yml`. The workflow is configured to run on pushes and pull requests to `main`, and manually, using JDK 17, Android SDK 35, and NDK `29.0.13846066`. It runs the engine unit tests and native bring-up probes, then requests these build tasks: `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, and `:Pcore:assembleDebug`. This is useful evidence that the authors intend to build an AAR from `Pcore`, but a workflow file by itself is **not proof that the latest run passed**. The GitHub Releases page currently returns no published releases, so there is no verified ready-made engine package to download from Releases. I have not obtained or tested a built AAR/APK, and I have not confirmed a successful recent CI run.
+
+The app's Gradle version catalog also declares Firebase Crashlytics. I did not verify whether Crashlytics is initialized or whether crash data is actually transmitted, so treat telemetry behavior as **unverified** and inspect it before embedding the engine. Do not assume either that data is uploaded or that it is not.
+
 ### Safest next experiment
 
 Build and inspect PrismSpace independently in its own disposable fork/workflow first, without changing CalcVault. Confirm the build output and license/security posture, then determine whether its engine module can be exported as a compatible library and what host initialization, proxy components, manifest declarations, native ABIs, and minimum SDK it requires. Only then plan a dedicated integration branch. Do not merge its full app or its permissions directly into CalcVault.
