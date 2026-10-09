@@ -30,6 +30,14 @@ The BlackBox family remains a possible source-based route, but its core requires
 - Do not turn on any device-spoofing, hidden-hook, or anti-detection extras merely to make the first harmless test app launch.
 - First acceptance test: a harmless test APK displays its real first screen inside CalcVault; basic interaction works; its data stays separate; deleting the virtual copy removes only that copy; the original app remains installed.
 
+## Second candidate check: legacy VirtualApp
+
+Repository reviewed: https://github.com/lockseal/VirtualApp_aslody
+
+This is a historical fork of asLody's VirtualApp. Its README says the public GitHub source stopped being updated in December 2017 and that the actively updated commercial source is separate. The repository has a large native/AIDL surface and no GitHub releases found in the release listing checked. It is therefore **not selected for direct integration**: its age and lack of a current maintained release create substantial compatibility and security uncertainty on modern Android.
+
+This check does not establish that no suitable engine exists anywhere. It means the two candidates checked so far are not ready to drop into this CodeAssist project safely. The next viable path is to choose a maintained engine with auditable source and a build path that can actually produce a compatible library, then prove it with a harmless test APK before connecting it to CalcVault.
+
 ## Required integration sequence
 
 1. Confirm CodeAssist can build and package the candidate engine's Java/AIDL and JNI libraries in this project format, or use a verified compatible prebuilt AAR whose source and license can be audited.
