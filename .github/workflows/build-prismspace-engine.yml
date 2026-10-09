@@ -1,0 +1,63 @@
+name: Build isolated virtual engine candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - clone-engine-prototype
+    paths:
+      - ".github/workflows/build-prismspace-engine.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-engine-aar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout CalcVault branch
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned PrismSpace source
+        uses: actions/checkout@v5
+        with:
+          repository: mhmdwaelanwr/PrismSpace
+          ref: 990a414f4e0eea68ef50230cb09c3b02ec6d700b
+          path: prismspace
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: prismspace/**/*.gradle*
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install SDK and NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;29.0.13846066"
+
+      - name: Build engine module only
+        working-directory: prismspace
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :Pcore:testDebugUnitTest :Pcore:assembleDebug
+
+      - name: Upload engine AAR for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: prismspace-pcore-debug-aar
+          path: prismspace/Pcore/build/outputs/aar/*.aar
+          if-no-files-found: error
+          retention-days: 7
