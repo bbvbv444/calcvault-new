@@ -76,3 +76,10 @@ Build and inspect PrismSpace independently in its own disposable fork/workflow f
 - Do not claim a copied app runs until its actual UI is displayed and basic interactions work on a device.
 - Do not tell the user to uninstall the original app before independent-copy behavior has been demonstrated.
 - A successful CodeAssist sync is not proof of a successful build or runtime test.
+
+
+## Isolated AAR build workflow added
+
+A separate GitHub Actions workflow has now been added at `.github/workflows/build-prismspace-engine.yml` on the `clone-engine-prototype` branch. It checks out PrismSpace at the exact reviewed source commit `990a414f4e0eea68ef50230cb09c3b02ec6d700b`, uses JDK 17 / Android SDK 35 / NDK 29, runs the `Pcore` unit tests and builds only the `Pcore` debug AAR. If successful, it uploads the AAR as a short-lived (7-day) workflow artifact for inspection. The workflow does not add PrismSpace source or dependencies to CalcVault's app, does not change `CloneRuntime.java`, and does not alter `main`.
+
+The workflow has been committed, but its run result is not yet verified. A successful AAR build would still not prove the library can safely run third-party apps inside CalcVault; the AAR must be inspected for manifest requirements, native libraries, initialization APIs, privacy/network behavior, and host compatibility before any integration.
