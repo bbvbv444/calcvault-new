@@ -10,7 +10,7 @@ The Open Copy action intentionally does not send the APK to Android's package in
 
 Source: https://github.com/TeguFy/blackbox-android
 
-The project describes itself as a no-root virtualization engine. It is source code rather than a verified ready-to-use AAR in this repository. Its Bcore module includes native code and requires an Android Gradle build, NDK, AIDL, reflection hooks, proxy components, and Java 21 configuration. This CalcVault CodeAssist module currently declares Java 8 and uses `app/module.toml`, so dropping a few Java files into the existing source tree would not integrate the engine.
+The project describes itself as a no-root virtualization engine. It is source code rather than a verified ready-to-use AAR in this repository. The repository tree contains native/AIDL source files, and the only published release asset found was a standalone debug APK, not a reusable AAR. Its Bcore module requires an Android Gradle build, NDK, AIDL, reflection hooks, proxy components, and Java 21 configuration. This CalcVault CodeAssist module currently declares Java 8 and uses `app/module.toml`, so dropping a few Java files into the existing source tree would not integrate the engine.
 
 ### Security review required before importing
 
