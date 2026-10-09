@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.calcvault'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.example.calcvault.gradlesourcetest'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1-source-build-test'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile '../../app/src/main/AndroidManifest.xml'
+            java.srcDirs = ['../../app/src/main/java']
+            aidl.srcDirs = ['../../app/src/main/aidl']
+            res.srcDirs = ['../../app/src/main/res']
+            assets.srcDirs = ['../../app/src/main/assets']
+            jniLibs.srcDirs = ['../../app/src/main/jniLibs']
+            resources.srcDirs = ['../../app/src/main/resources']
+        }
+    }
+}
