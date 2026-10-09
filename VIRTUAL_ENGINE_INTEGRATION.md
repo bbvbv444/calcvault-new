@@ -50,7 +50,9 @@ PrismSpace is a more recent research project with a separate `Pcore` Android lib
 
 I inspected PrismSpace's current `.github/workflows/android.yml`. The workflow is configured to run on pushes and pull requests to `main`, and manually, using JDK 17, Android SDK 35, and NDK `29.0.13846066`. It runs the engine unit tests and native bring-up probes, then requests these build tasks: `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, and `:Pcore:assembleDebug`. This is useful evidence that the authors intend to build an AAR from `Pcore`, but a workflow file by itself is **not proof that the latest run passed**. The GitHub Releases page currently returns no published releases, so there is no verified ready-made engine package to download from Releases. I have not obtained or tested a built AAR/APK, and I have not confirmed a successful recent CI run.
 
-The app's Gradle version catalog also declares Firebase Crashlytics. I did not verify whether Crashlytics is initialized or whether crash data is actually transmitted, so treat telemetry behavior as **unverified** and inspect it before embedding the engine. Do not assume either that data is uploaded or that it is not.
+### Crash-log transmission finding
+
+A follow-up source search found a concrete reporting path in PrismSpace: `App.kt` calls `CrashLogSubmitter.submitPendingCrashLogs(...)` during app startup, and `CrashLogSubmitterImpl.kt` reads pending engine crash `.log` files, scrubs some patterns, and passes the contents to `FirebaseCrashlytics.recordException(...)` with package and timestamp keys. That means this code is designed to send pending engine crash-log content through Firebase Crashlytics; scrubbing is not a guarantee that every sensitive value is removed. Before any reuse, this path must be excluded or explicitly redesigned and reviewed. I have not run the app or observed a network transmission, so this is a source-code finding, not a live traffic test.
 
 ### Safest next experiment
 
