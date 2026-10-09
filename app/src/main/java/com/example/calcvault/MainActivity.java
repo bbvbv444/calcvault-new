@@ -305,9 +305,11 @@ public class MainActivity extends Activity {
                 del.setOnClickListener(x->confirmDeleteStoredCopy(record));
                 row.addView(del,new LinearLayout.LayoutParams(dp(82),dp(42)));
 
-                Button original=button("Uninstall Original");
+                Button original=button("Original Protected");
                 original.setTextSize(9);
-                original.setOnClickListener(x->uninstallOriginal(pkg,name));
+                original.setEnabled(false);
+                original.setAlpha(0.65f);
+                original.setOnClickListener(null);
                 row.addView(original,new LinearLayout.LayoutParams(dp(100),dp(42)));
 
                 v.addView(row,new LinearLayout.LayoutParams(-1,-2));
