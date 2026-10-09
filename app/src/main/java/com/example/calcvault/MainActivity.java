@@ -360,31 +360,15 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // Android does not let CalcVault directly run another app's Activity
-        // from a stored APK. Hand the saved APK to Android's package installer.
-        // This installs it as a normal Android app; Android may ask for approval.
-        if(Build.VERSION.SDK_INT>=26&&!getPackageManager().canRequestPackageInstalls()){
-            try{
-                Intent settings=new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        Uri.parse("package:"+getPackageName()));
-                startActivity(settings);
-                toast("Allow CalcVault to install APK files, then tap Open Copy again");
-            }catch(Exception e){
-                toast("Enable APK installs for CalcVault in Android settings");
-            }
-            return;
-        }
-
-        try{
-            Uri apkUri=Uri.parse("content://com.example.calcvault.privatefiles/clone/"+record.id+"/base.apk");
-            Intent install=new Intent(Intent.ACTION_INSTALL_PACKAGE);
-            install.setDataAndType(apkUri,"application/vnd.android.package-archive");
-            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            install.putExtra(Intent.EXTRA_RETURN_RESULT,true);
-            startActivityForResult(install,915);
-        }catch(Exception e){
-            toast("Android could not open the APK installer");
-        }
+        // Do not install the copy as a separate Android app. The virtual
+        // Activity bridge is not yet able to attach and run third-party
+        // Activity lifecycles, so opening it here would falsely imply that
+        // the private copy can already run independently.
+        new AlertDialog.Builder(this)
+            .setTitle("Virtual app engine not ready")
+            .setMessage("CalcVault has saved this app privately, but its in-app runtime is not complete yet. Nothing will be installed separately, and your original app will not be changed. Keep the original installed while this feature is being completed.")
+            .setPositiveButton("OK",null)
+            .show();
     }
 
     private void provisionPrivateProfile(String packageName){
