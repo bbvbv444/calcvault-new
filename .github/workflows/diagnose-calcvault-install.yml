@@ -1,0 +1,77 @@
+name: Diagnose CalcVault APK installation in Android emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - calcvault-gradle-source-build-test
+    paths:
+      - "calc-source-build/**"
+      - "app/src/main/**"
+      - ".github/workflows/diagnose-calcvault-install.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated test branch
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install Gradle 8.9
+        run: |
+          curl --fail --location --retry 3 https://services.gradle.org/distributions/gradle-8.9-bin.zip --output /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build isolated source APK
+        working-directory: calc-source-build
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Verify APK package metadata and signature
+        run: |
+          APK="calc-source-build/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/apk-badging.txt
+          grep -q "package: name='com.example.calcvault.gradlesourcetest'" /tmp/apk-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+
+      - name: Install APK and launch app in emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install -r calc-source-build/app/build/outputs/apk/debug/app-debug.apk
+            adb shell monkey -p com.example.calcvault.gradlesourcetest 1
+            sleep 3
+            adb logcat -d -t 300 | grep -E "FATAL EXCEPTION|AndroidRuntime|INSTALL_FAILED" && exit 1 || true
+
+      - name: Upload diagnostic APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcvault-install-diagnostic-apk
+          path: calc-source-build/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
