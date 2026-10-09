@@ -70,13 +70,8 @@ jobs:
             sleep 5
             adb shell dumpsys activity activities > diagnostics/activities.txt
             adb logcat -d -t 1000 > diagnostics/logcat.txt
-            if grep -E "FATAL EXCEPTION|INSTALL_FAILED" diagnostics/logcat.txt; then
-              exit 1
-            fi
-            if ! grep -q "com.example.calcvault.gradlesourcetest" diagnostics/activities.txt; then
-              echo "Package installed, but launcher activity was not found in activity dump."
-              exit 1
-            fi
+            ! grep -Eq 'FATAL EXCEPTION|INSTALL_FAILED' diagnostics/logcat.txt || exit 1
+            grep -q 'com.example.calcvault.gradlesourcetest' diagnostics/activities.txt || { echo 'Package installed, but launcher activity was not found in activity dump.'; exit 1; }
 
       - name: Upload diagnostic APK and logs
         if: always()
