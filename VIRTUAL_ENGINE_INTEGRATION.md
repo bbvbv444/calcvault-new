@@ -106,3 +106,10 @@ The pinned Pcore source shows a deeper host-app requirement: its sample app defi
 The Pcore module is an Android library using Kotlin, Android AIDL, NDK build integration, Java 17/Kotlin 17, and project modules `:black-reflection` and `:compiler`, plus coroutines, AppCompat, TOML parsing, and FreeReflection. These are additional compatibility/build requirements beyond simply copying the AAR into a `libs` folder. Its source also installs crash-monitoring and exception-handling helpers during `PrismSpaceCore` class loading; those code paths need review before enabling it in the host app.
 
 **Next technical gate:** determine whether CalcVault's current CodeAssist `app/module.toml` project can safely adopt a Gradle-based Kotlin/AIDL/JNI library and required Application/manifest setup without disrupting vault features. Until that is verified, do not add the AAR to the app or change existing runtime code.
+
+
+### Current CodeAssist project-format compatibility check (2026-10-09)
+
+Checked the repository tree and `.platform/workspace.json`: CalcVault is configured with `buildSystem: native`, a single `app` module, and `app/module.toml`; there is no Gradle root build file or Gradle wrapper in the branch. PrismSpace Pcore is a Gradle Android library that depends on two other Gradle modules and Kotlin/AIDL/JNI build steps. Therefore, the current workspace cannot consume the built AAR through the ordinary Gradle dependency workflow as-is, and the CI workflow that builds Pcore does not build CalcVault.
+
+**Recommendation:** don't convert the existing CodeAssist project in-place just to test this candidate. That could break the current app and vault features. If a future experiment is needed, first make a separate branch from `clone-engine-prototype` and prototype a minimal Gradle-based host/build path without touching the existing `app/module.toml` project; verify whether CodeAssist can open/build that path before migrating anything. The other route is to identify an engine that explicitly supports this native CodeAssist project format, but no such drop-in engine has been verified yet.
