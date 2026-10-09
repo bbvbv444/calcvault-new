@@ -354,18 +354,17 @@ public class MainActivity extends Activity {
             return;
         }
 
-        try{
-            VirtualRuntimeCoordinator coordinator =
-                    new VirtualRuntimeCoordinator(this);
-            VirtualRuntimeCoordinator.Prepared prepared =
-                    coordinator.prepare(record);
-            new VirtualLaunchDispatcher(this).launch(prepared);
+        // A copied APK cannot be launched as a normal Android Activity merely
+        // by loading its class. Use Android's managed/private profile instead.
+        // The first app is installed into that profile by AppSpaceAdminReceiver
+        // during profile provisioning, then launched by Android itself.
+        UserHandle profile=findPrivateProfile();
+        if(profile==null){
+            provisionPrivateProfile(record.packageName);
             return;
-        }catch(Exception virtualError){
-            toast(virtualError.getMessage()==null
-                    ? "Could not prepare the private copy"
-                    : virtualError.getMessage());
         }
+
+        launchCopiedAppInProfile(record.packageName,profile);
     }
 
     private void provisionPrivateProfile(String packageName){
