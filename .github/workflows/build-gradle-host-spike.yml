@@ -1,0 +1,55 @@
+name: Build isolated CalcVault Gradle host spike
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - prismspace-gradle-host-spike
+    paths:
+      - "gradle-host-spike/**"
+      - ".github/workflows/build-gradle-host-spike.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-host-spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout experiment branch
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle 8.9
+        run: |
+          curl --fail --location --retry 3 https://services.gradle.org/distributions/gradle-8.9-bin.zip --output /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build the separate host spike
+        working-directory: gradle-host-spike
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcvault-gradle-host-spike-debug-apk
+          path: gradle-host-spike/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
