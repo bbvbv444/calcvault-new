@@ -82,4 +82,18 @@ Build and inspect PrismSpace independently in its own disposable fork/workflow f
 
 A separate GitHub Actions workflow has now been added at `.github/workflows/build-prismspace-engine.yml` on the `clone-engine-prototype` branch. It checks out PrismSpace at the exact reviewed source commit `990a414f4e0eea68ef50230cb09c3b02ec6d700b`, uses JDK 17 / Android SDK 35 / NDK 29, runs the `Pcore` unit tests and builds only the `Pcore` debug AAR. If successful, it uploads the AAR as a short-lived (7-day) workflow artifact for inspection. The workflow does not add PrismSpace source or dependencies to CalcVault's app, does not change `CloneRuntime.java`, and does not alter `main`.
 
-The workflow has been committed, but its run result is not yet verified. A successful AAR build would still not prove the library can safely run third-party apps inside CalcVault; the AAR must be inspected for manifest requirements, native libraries, initialization APIs, privacy/network behavior, and host compatibility before any integration.
+The workflow completed successfully on 2026-10-09 (run 37940675567). Both :Pcore:testDebugUnitTest and :Pcore:assembleDebug completed, and GitHub uploaded the prismspace-pcore-debug-aar artifact (2,704,028 bytes; expires 2026-10-16). This proves the pinned Pcore module builds in CI; it does not prove the library is safe or that a cloned app runs inside CalcVault.
+
+
+### CalcVault isolated AAR inspection (2026-10-09)
+
+Downloaded and inspected the workflow artifact without adding it to CalcVault. The ZIP contains Pcore-debug.aar (2,712,294 bytes), classes.jar, a 1,258,938-byte Android manifest, and native libraries for ARM64 and ARMv7. The library exposes PrismEngineFacade methods for engine initialization, virtual install, launch, app data clearing, stopping, and status checks, so it has a real engine-facing API surface rather than being only a placeholder.
+
+**Integration blockers identified:**
+- The AAR manifest contains 314 declared permissions, 151 activities, 101 services, and 52 providers. Many proxy components are marked exported. Merging this manifest directly into CalcVault would create an unnecessarily broad permission/component surface and could cause conflicts or security exposure.
+- The manifest sets android:usesCleartextTraffic="true", which permits unencrypted network traffic for the app unless overridden. This must be understood and tightened before any integration.
+- The library uses Android framework hooks and native code; an AAR by itself is not sufficient. We still need to validate its runtime initialization, manifest-merger strategy, dependency requirements, and behavior on the target phone.
+- The source has a previously identified startup crash-log reporting path through Firebase Crashlytics. This AAR was not dynamically tested for network traffic, and we must not assume that sensitive log data is fully scrubbed.
+- The current CalcVault CodeAssist project declares Java 8 and uses app/module.toml; this AAR was built with JDK 17/SDK 35 and may require Kotlin/AndroidX dependencies and manifest/component wiring not yet present in CalcVault.
+
+**Decision: do not integrate this raw AAR yet.** Keep it as an isolated candidate and do not replace the current runtime or merge its manifest wholesale. Next, inspect its build metadata and source initialization path to identify the smallest safe integration surface, and test whether the current project can support that surface. A real on-device test with a harmless APK remains mandatory before claiming clone functionality. The original app must remain installed during testing.
