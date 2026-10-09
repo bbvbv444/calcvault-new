@@ -113,3 +113,14 @@ The Pcore module is an Android library using Kotlin, Android AIDL, NDK build int
 Checked the repository tree and `.platform/workspace.json`: CalcVault is configured with `buildSystem: native`, a single `app` module, and `app/module.toml`; there is no Gradle root build file or Gradle wrapper in the branch. PrismSpace Pcore is a Gradle Android library that depends on two other Gradle modules and Kotlin/AIDL/JNI build steps. Therefore, the current workspace cannot consume the built AAR through the ordinary Gradle dependency workflow as-is, and the CI workflow that builds Pcore does not build CalcVault.
 
 **Recommendation:** don't convert the existing CodeAssist project in-place just to test this candidate. That could break the current app and vault features. If a future experiment is needed, first make a separate branch from `clone-engine-prototype` and prototype a minimal Gradle-based host/build path without touching the existing `app/module.toml` project; verify whether CodeAssist can open/build that path before migrating anything. The other route is to identify an engine that explicitly supports this native CodeAssist project format, but no such drop-in engine has been verified yet.
+
+
+### Isolated Gradle host spike result (2026-10-09)
+
+Created a separate branch, `prismspace-gradle-host-spike`, and added a minimal standalone Android Gradle app under `gradle-host-spike/`. GitHub Actions run 37942163616 completed successfully: https://github.com/bbvbv444/calcvault-new/actions/runs/37942163616. The workflow built and uploaded `calcvault-gradle-host-spike-debug-apk` (artifact ID 11621429945, expires 2026-10-16). The APK is only a tiny build-path test screen; it is not CalcVault and contains no virtualization engine.
+
+**What this proves:** a separate Gradle-based Android project can be built by GitHub Actions using JDK 17, Gradle 8.9, Android SDK 35, Java 8 source compatibility, and min SDK 24.
+
+**What remains unproven:** whether CodeAssist on the user's phone can open/build this Gradle project; whether PrismSpace can be integrated safely; and whether any copied APK can launch and operate inside CalcVault. The spike has not been merged into `main`, has not replaced the native CodeAssist app, and has not changed `CloneRuntime.java`.
+
+**Next gate:** do not migrate the existing project based on CI success alone. First verify CodeAssist compatibility, then perform a narrow dependency/manifest/security integration test in an isolated branch. Keep all original apps installed until a virtual copy is proven independent on-device.
