@@ -38,6 +38,18 @@ This is a historical fork of asLody's VirtualApp. Its README says the public Git
 
 This check does not establish that no suitable engine exists anywhere. It means the two candidates checked so far are not ready to drop into this CodeAssist project safely. The next viable path is to choose a maintained engine with auditable source and a build path that can actually produce a compatible library, then prove it with a harmless test APK before connecting it to CalcVault.
 
+## Third candidate check: PrismSpace
+
+Repository reviewed: https://github.com/mhmdwaelanwr/PrismSpace
+
+PrismSpace is a more recent research project with a separate `Pcore` Android library module, AIDL, Java/Kotlin, and native C/C++ code. Its repository has an Apache-2.0 LICENSE and a GitHub Actions Android build workflow. Its own README explicitly describes it as experimental and says it should not be treated as a security boundary until independently reviewed. The inspected build files require JDK 17, Android SDK 35, and NDK 29.0.13846066; `Pcore` uses Java/Kotlin 17 and native build integration.
+
+**Decision: promising for a separate build experiment, not ready to copy into CalcVault.** It is not a prebuilt AAR, it is a full research codebase with substantial AIDL/native/framework work, and CalcVault currently uses CodeAssist's `app/module.toml` setup with Java 8. The host app also declares a Firebase Crashlytics dependency, which must be reviewed for data collection before reusing any of this code. I have not verified a successful clean build or a real clone launch from PrismSpace, and have not imported its code into CalcVault.
+
+### Safest next experiment
+
+Build and inspect PrismSpace independently in its own disposable fork/workflow first, without changing CalcVault. Confirm the build output and license/security posture, then determine whether its engine module can be exported as a compatible library and what host initialization, proxy components, manifest declarations, native ABIs, and minimum SDK it requires. Only then plan a dedicated integration branch. Do not merge its full app or its permissions directly into CalcVault.
+
 ## Required integration sequence
 
 1. Confirm CodeAssist can build and package the candidate engine's Java/AIDL and JNI libraries in this project format, or use a verified compatible prebuilt AAR whose source and license can be audited.
