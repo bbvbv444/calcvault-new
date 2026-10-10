@@ -67,7 +67,7 @@ jobs:
   smoke-test-emulator:
     needs: build-candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - name: Download candidate APK artifact
         uses: actions/download-artifact@v4
@@ -82,7 +82,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 1200
+          emulator-boot-timeout: 1800
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
