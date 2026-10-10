@@ -63,3 +63,39 @@ Therefore the blocker is not simply adding a library dependency. A real guest ru
 - Test process death, relaunch, back navigation and permissions.
 - Keep all anti-detection, signature spoofing and integrity-bypass code excluded.
 - Keep `main` and `CloneRuntime.java` unchanged until the user explicitly approves any future merge.
+
+## Separate candidate build audit — VirtualApp_16
+
+This section records a separate CI job and must not be confused with the Renjana source review above.
+
+Candidate repository: https://github.com/f0restw0w/VirtualApp_16  
+Build workflow: https://github.com/bbvbv444/calcvault-new/actions/runs/38054945439  
+Workflow artifact: `virtualapp-candidate-debug-apks` (temporary CI artifact; expires 2026-10-15).
+
+### What the successful workflow proves
+
+- GitHub Actions checked out the candidate repository into a temporary `candidate/` directory.
+- It installed JDK 17, Android SDK API 34 and NDK 21.4.7075529.
+- It ran the candidate's `./gradlew --no-daemon assembleDebug` and uploaded the resulting APK files.
+- The workflow did not copy candidate engine source into CalcVault and did not change CalcVault's `CloneRuntime.java`.
+
+### What it does not prove
+
+- The APK has **not** been inspected or launched on a device as part of this audit.
+- No sample guest app has been demonstrated running inside this engine in our test.
+- No independent data-isolation, delete-copy, process-death or relaunch test has been performed.
+- A green build is not evidence that this engine can be integrated into CalcVault as-is.
+
+### Integration and compatibility risks found in source
+
+- VirtualApp_16 is a full host app plus a substantial Java/native engine library, not a ready-to-drop-in CalcVault plug-in.
+- Its README warns that it is highly unstable and not recommended for production.
+- Its own `docs/KNOWN-ISSUES.md` records issues including hidden-API bypass failures on newer Android versions, background activity launch restrictions, signature verification failures for some apps, SELinux denials, and incomplete Google Play Services behavior.
+- Its app manifest requests broad permissions including package visibility and all-files access. These must not be copied into CalcVault wholesale; each permission needs a justified review.
+- Its core relies on hidden Android APIs and Java/native hooks, so device and OS-version testing is mandatory.
+
+### Current decision
+
+Keep VirtualApp_16 as an unintegrated research candidate. Do not merge its app, manifest, permissions, hooks or native libraries into CalcVault yet. The next safe engineering task is a read-only integration map of its initialization, service/process proxies, manifest components and native ABI files against CalcVault's current app structure. Only after that review should we decide whether a minimal isolated integration experiment is technically reasonable.
+
+The acceptance tests above remain required. Do not claim cloning works until a harmless guest APK actually launches from CalcVault and separate-instance data isolation is demonstrated.
