@@ -86,25 +86,4 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            set -eu
-            echo "Downloaded artifact contents:"
-            find candidate-apks -type f -print
-            APK="$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"
-            if [ -z "$APK" ]; then
-              APK="$(find candidate-apks -type f -iname '*.apk' -print -quit)"
-            fi
-            if [ -z "$APK" ]; then
-              echo "No APK file was found in the downloaded artifact."
-              exit 1
-            fi
-            echo "Installing candidate APK: $APK"
-            adb install "$APK"
-            adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
-            sleep 20
-            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' || true
-            adb logcat -d -t 5000 > candidate-logcat.txt
-            if grep -E 'FATAL EXCEPTION|Fatal signal|Process: io.va.exposed64' candidate-logcat.txt; then
-              echo "Candidate host app reported a fatal crash during startup."
-              exit 1
-            fi
-            echo "Host APK installed and launch command completed without a detected fatal crash."
+            set -eu; echo "Downloaded artifact contents:"; find candidate-apks -type f -print; APK="$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"; test -n "$APK"; echo "Installing candidate APK: $APK"; adb install "$APK"; adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1; sleep 20; adb logcat -d -t 5000 > candidate-logcat.txt; if grep -E 'FATAL EXCEPTION|Fatal signal|Process: io.va.exposed64' candidate-logcat.txt; then echo "Candidate host app reported a fatal crash during startup."; exit 1; fi; echo "Host APK installed and launch command completed without a detected fatal crash."
