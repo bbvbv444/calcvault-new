@@ -1,0 +1,63 @@
+name: Test isolated VirtualApp engine candidate
+
+on:
+  push:
+    branches:
+      - calcvault-renjana-engine-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout VirtualApp candidate source (isolated CI only)
+        uses: actions/checkout@v4
+        with:
+          repository: f0restw0w/VirtualApp_16
+          ref: main
+          path: candidate
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and NDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;21.4.7075529"
+
+      - name: Verify candidate source and native modules
+        working-directory: candidate
+        run: |
+          test -f gradlew
+          test -f settings.gradle
+          test -f app/build.gradle
+          test -d lib/src/main/jni
+          echo "Candidate source structure found; no CalcVault files are changed by this job."
+
+      - name: Build candidate debug APK
+        working-directory: candidate
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: List APK outputs
+        working-directory: candidate
+        run: find app/build/outputs/apk -type f -name '*.apk' -print
+
+      - name: Upload candidate APKs for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtualapp-candidate-debug-apks
+          path: candidate/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 5
