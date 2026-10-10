@@ -85,8 +85,17 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK="$(find candidate-apks -type f -name '*universal.apk' | head -n 1)"
-            test -n "$APK"
+            echo "Downloaded artifact contents:"
+            find candidate-apks -type f -print
+            APK="$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"
+            if [ -z "$APK" ]; then
+              APK="$(find candidate-apks -type f -iname '*.apk' -print -quit)"
+            fi
+            if [ -z "$APK" ]; then
+              echo "No APK file was found in the downloaded artifact."
+              exit 1
+            fi
+            echo "Installing candidate APK: $APK"
             adb install "$APK"
             adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
             sleep 20
