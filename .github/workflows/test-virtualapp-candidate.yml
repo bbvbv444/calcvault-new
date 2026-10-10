@@ -67,7 +67,12 @@ jobs:
   smoke-test-emulator:
     needs: build-candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 30, 34, 35]
+    name: Smoke test Android API ${{ matrix.api-level }}
     steps:
       - name: Download candidate APK artifact
         uses: actions/download-artifact@v4
@@ -78,7 +83,7 @@ jobs:
       - name: Boot Android emulator and smoke-test host app
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           profile: pixel_2
