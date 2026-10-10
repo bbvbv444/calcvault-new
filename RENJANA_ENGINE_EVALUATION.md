@@ -144,3 +144,30 @@ This confirms the engine is a substantial source-level subsystem, not a small Ja
 ### Proof-of-concept scope decision
 
 Do not attempt to transplant the 483-file engine library into CalcVault's current CodeAssist module as the next step. That would be a broad, high-risk change and could affect the existing calculator/vault app. The reasonable proof-of-concept is first to validate the candidate host APK and one harmless guest app in an isolated Android test environment, then separately estimate the work needed to bring the proven runtime into CalcVault. No CalcVault application source was changed as part of this inventory.
+
+
+## Built APK artifact inspection — 2026-10-10
+
+The CI artifact `virtualapp-candidate-debug-apks.zip` from workflow run [38054945439](https://github.com/bbvbv444/calcvault-new/actions/runs/38054945439) was downloaded and inspected as a ZIP/APK archive. This is static artifact inspection only; the APK was not installed or executed.
+
+### Confirmed from the artifact
+
+- The ZIP contains four debug APKs: ARM64, ARM32 (`armeabi-v7a`), x86-64, and universal.
+- The ARM64 APK contains `lib/arm64-v8a/libva++.so` (about 7.1 MB) and `libepic.so`; both are valid ELF shared-library files.
+- The universal APK contains native libraries for ARM64, ARM32 and x86-64, including `libva++.so` and `libepic.so` for each ABI.
+- The APK archives include Android DEX code and signing metadata.
+
+### What this adds to the evidence
+
+This confirms that the candidate's CI build produced APK packages with native runtime libraries included; the earlier source-tree finding that no `.so` files were committed does not mean the build omitted them.
+
+### Remaining unknowns
+
+- Whether the candidate APK installs on the user's actual Android version/device.
+- Whether it launches a harmless guest APK successfully on that device.
+- Whether guest app data remains isolated between instances and after relaunch.
+- Whether its signing/package setup or Android-version constraints explain the previous separate CalcVault diagnostic APK's `App not installed` error. No causal link has been established.
+
+### Next safe step
+
+Before asking the user to install anything, review the candidate APK's manifest/package compatibility and signing/build metadata, then decide whether a device test is justified. Do not replace the CalcVault APK with this candidate or merge the candidate into CalcVault. Keep `main` and `CloneRuntime.java` unchanged.
