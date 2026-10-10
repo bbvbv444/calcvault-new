@@ -84,7 +84,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            set -euxo pipefail
+            set -eu
             APK="$(find candidate-apks -type f -name '*universal.apk' | head -n 1)"
             test -n "$APK"
             adb install "$APK"
