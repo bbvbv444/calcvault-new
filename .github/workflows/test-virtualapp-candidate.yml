@@ -67,7 +67,7 @@ jobs:
   smoke-test-emulator:
     needs: build-candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Download candidate APK artifact
         uses: actions/download-artifact@v4
@@ -78,11 +78,11 @@ jobs:
       - name: Boot Android emulator and smoke-test host app
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 1200
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
