@@ -180,10 +180,12 @@ The pinned candidate's `app/build.gradle` declares application ID `io.va.exposed
 The APK's debug build/signing identity and the device's Android version, CPU ABI, available storage and any installer error details would need to be checked before attributing an installation failure. No device install is requested yet.
 
 
-## Isolated emulator smoke-test workflow added — 2026-10-10
+## Isolated emulator smoke-test workflow — 2026-10-10
 
-The existing branch workflow `.github/workflows/test-virtualapp-candidate.yml` now has a second job, `smoke-test-emulator`, which depends on the candidate build job. It downloads that build's universal APK, boots an Android API 34 x86_64 emulator, attempts to install the candidate host, launches its declared application ID (`io.va.exposed64`), waits briefly, and checks recent logcat for obvious fatal startup crashes.
+The existing branch workflow `.github/workflows/test-virtualapp-candidate.yml` builds the candidate APK and then attempts a host smoke test. The first emulator attempt failed because the runner executed `set -o pipefail` under `/usr/bin/sh`, which does not support that option. After correcting the shell command, the next attempt failed because the Android emulator did not finish booting before the action's timeout. The candidate APK build job itself passed in both runs; the emulator install/launch test has **not** passed yet.
 
-**This test has been added but its result is not yet confirmed in this report.** A successful host smoke test would prove only that the candidate host installs and starts in this CI emulator. It would not prove guest-app cloning, app UI execution, or data isolation. Those require a further harmless guest-app test and explicit isolation checks.
+To avoid testing only one Android release, the workflow has now been updated on the existing branch to run emulator smoke tests across Android API levels 29, 30, 34 and 35, using x86_64 emulators. This is a broader compatibility screen, not proof of compatibility with every phone, Android version or CPU architecture. The candidate package includes ARM32, ARM64 and x86_64 native libraries in its universal APK, but runtime testing on physical ARM devices remains unverified.
 
-The workflow change is confined to the existing `calcvault-renjana-engine-audit` branch. It does not modify CalcVault application source, does not touch `CloneRuntime.java`, and does not change `main`. No user installation is requested.
+A passing host smoke test would prove only that the candidate host installs and starts in those CI emulators. It would not prove guest-app cloning, guest UI execution, or data isolation. Those still require a harmless guest-app test and explicit isolation checks.
+
+The workflow/report changes are confined to the existing `calcvault-renjana-engine-audit` branch. They do not modify CalcVault application source, do not touch `CloneRuntime.java`, and do not change `main`. No user installation is requested.
