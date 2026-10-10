@@ -99,3 +99,32 @@ Workflow artifact: `virtualapp-candidate-debug-apks` (temporary CI artifact; exp
 Keep VirtualApp_16 as an unintegrated research candidate. Do not merge its app, manifest, permissions, hooks or native libraries into CalcVault yet. The next safe engineering task is a read-only integration map of its initialization, service/process proxies, manifest components and native ABI files against CalcVault's current app structure. Only after that review should we decide whether a minimal isolated integration experiment is technically reasonable.
 
 The acceptance tests above remain required. Do not claim cloning works until a harmless guest APK actually launches from CalcVault and separate-instance data isolation is demonstrated.
+
+
+## VirtualApp_16 integration feasibility — deeper source audit
+
+Reviewed at pinned candidate commit `b3c634ad7941765df3da84a207aca94b7861afae`:
+- `docs/KNOWN-ISSUES.md`
+- `docs/ARCHITECTURE.md`
+- `docs/BUILD.md`
+- root `build.gradle`, `settings.gradle`
+- `app/build.gradle`, `lib/build.gradle`
+- host and library Android manifests
+- `XApp.java` startup sequence
+
+### Findings
+
+1. **The host application is the engine bootstrap.** The candidate's `XApp.attachBaseContext()` sets engine flags and calls `VirtualCore.get().startup(base)`; `onCreate()` then calls `VirtualCore.initialize(...)`. Adding only the `lib` directory to CalcVault would not initialize the runtime or provide its host UI/services.
+2. **It is a multi-module Gradle + native build, not compatible as a simple CodeAssist library drop-in.** The candidate uses root Gradle/Android Gradle Plugin 7.4.2, modules `:app` and `:lib`, JDK 17, NDK 21.4.7075529 and ndkBuild. CalcVault currently uses CodeAssist's `app/module.toml`, Java 8, compile SDK 36, min SDK 24 and target SDK 36. The project layouts/build tooling do not line up as a direct dependency.
+3. **Native binaries are part of the runtime.** The candidate compiles `libva++.so` and hook/IO-redirection code for multiple ABIs. Copying Java sources alone would leave native entry points missing; copying native files without matching build and startup integration would also be unsafe.
+4. **The manifests and component model are large.** The candidate declares its own Application, launcher/settings/install/share activities, receiver(s), virtual process/service infrastructure and broad permissions. Those cannot safely be pasted into CalcVault's existing manifest without a deliberate component-by-component merge and permission review.
+5. **Known issues directly affect reliability on modern Android.** The candidate documentation calls out hidden-API bypass risk on Android 15–16, background launch restrictions on Android 14+, SELinux denials, some signature-check failures, dynamic-code-loading restrictions, and incomplete GMS push/Maps/Play Integrity support. Its stated successful emulator tests do not replace testing on the user's Android phone.
+6. **CalcVault's current blocker remains framework attachment.** The prototype currently copies and inspects an APK and loads classes, but its execution boundary still reports that framework attachment is required. This is a fundamental runtime/lifecycle gap, not something a small launcher-only patch can resolve.
+
+### Decision after deeper audit
+
+**Do not embed VirtualApp_16 into the current CalcVault module yet.** A direct merge would require major changes to the app bootstrap, manifest, Gradle/module structure, native build and process/component architecture, risking existing calculator/vault features. The safer next step is to keep the candidate isolated and plan a minimal proof-of-concept in a separate test target before considering any CalcVault integration. No guest-app launch or data-isolation claim is approved until demonstrated in a test.
+
+### User-impact / installation status
+
+No new installation is requested at this stage. The candidate APK has only been built in GitHub Actions; this audit has not yet established that installing it would help solve the previous “App not installed” issue on the user's device. Keep CalcVault's main branch and `CloneRuntime.java` unchanged.
