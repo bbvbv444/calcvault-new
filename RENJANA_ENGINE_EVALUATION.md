@@ -178,3 +178,12 @@ Before asking the user to install anything, review the candidate APK's manifest/
 The pinned candidate's `app/build.gradle` declares application ID `io.va.exposed64`, min SDK 21, target SDK 33, and ABI filters for ARM64, ARM32 and x86-64. The host manifest's declared package is `io.virtualapp`, and it declares a large set of host activities, receivers, services and permissions. The app's configured min SDK is below CalcVault's min SDK 24, so the candidate's declared minimum Android version alone does not explain the earlier CalcVault APK installation failure. This is only a source-configuration cross-check; it does not prove the candidate installs on the user's device or identify the cause of the earlier error.
 
 The APK's debug build/signing identity and the device's Android version, CPU ABI, available storage and any installer error details would need to be checked before attributing an installation failure. No device install is requested yet.
+
+
+## Isolated emulator smoke-test workflow added — 2026-10-10
+
+The existing branch workflow `.github/workflows/test-virtualapp-candidate.yml` now has a second job, `smoke-test-emulator`, which depends on the candidate build job. It downloads that build's universal APK, boots an Android API 34 x86_64 emulator, attempts to install the candidate host, launches its declared application ID (`io.va.exposed64`), waits briefly, and checks recent logcat for obvious fatal startup crashes.
+
+**This test has been added but its result is not yet confirmed in this report.** A successful host smoke test would prove only that the candidate host installs and starts in this CI emulator. It would not prove guest-app cloning, app UI execution, or data isolation. Those require a further harmless guest-app test and explicit isolation checks.
+
+The workflow change is confined to the existing `calcvault-renjana-engine-audit` branch. It does not modify CalcVault application source, does not touch `CloneRuntime.java`, and does not change `main`. No user installation is requested.
