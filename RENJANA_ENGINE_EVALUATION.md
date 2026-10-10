@@ -39,3 +39,27 @@ A responsible next step is a clean, isolated feasibility spike on this branch: f
 ## Current CalcVault evidence
 
 The separate diagnostic workflow at https://github.com/bbvbv444/calcvault-new/actions/runs/37960548325 successfully built, installed and launched a *diagnostic CalcVault package* in a GitHub Android emulator. That validates the diagnostic build path only; it does not validate Renjana or the actual CalcVault guest-app runtime.
+
+
+## CalcVault prototype review on this branch
+
+The current prototype files were also inspected:
+
+- `VirtualActivityExecutor.java` explicitly resolves the launch Activity class but deliberately stops before calling third-party Activity lifecycle methods.
+- `VirtualActivityBridge.java` says Android framework attachment is required before a foreign Activity can be hosted.
+- `VirtualActivitySession.java` prepares the copied APK, class loader, application object and virtual context, but preparation is not proof of a working app session.
+- `VirtualActivityProxy.java` displays “Virtual runtime prepared”; that status must not be confused with a successfully running guest app.
+- `VirtualAppContainer.java` creates private directories and keeps the APK copy; it does not install a guest app into Android's package manager.
+
+Therefore the blocker is not simply adding a library dependency. A real guest runtime needs a compatible Activity/component lifecycle and Android service/resource/package handling, followed by device tests. A normal JVM class-loader test cannot prove this works.
+
+## Acceptance tests before a release claim
+
+- Build the isolated CalcVault branch successfully.
+- Install and launch the APK on an emulator and a real supported Android device.
+- Import a harmless sample APK and launch its actual UI from inside CalcVault.
+- Confirm the sample's files/preferences are private to its instance and do not leak into another instance.
+- Confirm delete-copy removes only that instance's private data and never uninstalls the original app.
+- Test process death, relaunch, back navigation and permissions.
+- Keep all anti-detection, signature spoofing and integrity-bypass code excluded.
+- Keep `main` and `CloneRuntime.java` unchanged until the user explicitly approves any future merge.
