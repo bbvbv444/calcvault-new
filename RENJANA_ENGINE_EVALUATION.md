@@ -128,3 +128,19 @@ Reviewed at pinned candidate commit `b3c634ad7941765df3da84a207aca94b7861afae`:
 ### User-impact / installation status
 
 No new installation is requested at this stage. The candidate APK has only been built in GitHub Actions; this audit has not yet established that installing it would help solve the previous “App not installed” issue on the user's device. Keep CalcVault's main branch and `CloneRuntime.java` unchanged.
+
+
+## Source inventory cross-check — VirtualApp_16 pinned tree
+
+A read-only recursive tree check of candidate commit `b3c634ad7941765df3da84a207aca94b7861afae` found:
+- 1,314 repository tree entries in total.
+- 483 Java source files under the engine library.
+- 63 Java source files in the host application.
+- 93 native C/C++/header/build-script files under the native tree.
+- No committed `.so` shared-library binaries; the native libraries must be built as part of the toolchain.
+
+This confirms the engine is a substantial source-level subsystem, not a small Java-only module. CalcVault's current `app/module.toml` does define a `jniLibs` source folder, but that alone does not supply the candidate's ndkBuild configuration, required NDK toolchain, native compilation, runtime initialization, process declarations or component/service graph.
+
+### Proof-of-concept scope decision
+
+Do not attempt to transplant the 483-file engine library into CalcVault's current CodeAssist module as the next step. That would be a broad, high-risk change and could affect the existing calculator/vault app. The reasonable proof-of-concept is first to validate the candidate host APK and one harmless guest app in an isolated Android test environment, then separately estimate the work needed to bring the proven runtime into CalcVault. No CalcVault application source was changed as part of this inventory.
