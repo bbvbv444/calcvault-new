@@ -189,3 +189,26 @@ To avoid testing only one Android release, the workflow has now been updated on 
 A passing host smoke test would prove only that the candidate host installs and starts in those CI emulators. It would not prove guest-app cloning, guest UI execution, or data isolation. Those still require a harmless guest-app test and explicit isolation checks.
 
 The workflow/report changes are confined to the existing `calcvault-renjana-engine-audit` branch. They do not modify CalcVault application source, do not touch `CloneRuntime.java`, and do not change `main`. No user installation is requested.
+
+
+## Component-by-component integration map — VirtualApp_16
+
+This is a read-only mapping based on the pinned source files. It is not an integration patch.
+
+| Area | VirtualApp_16 requirement | CalcVault situation | Result |
+|---|---|---|---|
+| Application startup | A custom `Application` class (`XApp`) starts and initializes `VirtualCore` | CalcVault has no equivalent VirtualCore bootstrap in its manifest | Major host-startup change required |
+| Host UI | Host activities for app selection, home, settings, loading and management | CalcVault already has its calculator/vault UI in `MainActivity` | Do not replace CalcVault UI with candidate UI |
+| Virtual processes | Dedicated virtual process/service infrastructure and Binder interfaces | Prototype currently uses a local proxy/session scaffold | Missing engine infrastructure |
+| Activity launch | Transaction/lifecycle interception and stub components | Prototype intentionally stops before attaching a foreign Activity | Core blocker remains |
+| Package parsing | Hidden API/reflection-based package parsing and virtual package manager | CalcVault currently inspects APK metadata with PackageManager archive APIs | Existing metadata inspection is not equivalent |
+| Native layer | ndkBuild compiles `libva++.so` and related native hooks for device ABIs | CodeAssist module lists Java/JNI source sets but has no candidate native build configuration | Native toolchain integration required |
+| Dependencies | AGP 7.4.2, Gradle 7.5, JDK 17, Android SDK 34, NDK 21.4.7075529, legacy Android Support libraries and hook libraries | CodeAssist module uses `module.toml`, Java 8, compile/target SDK 36 | Not a direct dependency addition |
+| Permissions/manifest | Broad package visibility and other permissions; large set of activities, services, providers and receivers | CalcVault manifest is small and has existing file-provider and launcher behavior | No wholesale manifest merge; every component and permission needs justification |
+| Compatibility | Candidate's own docs record Android-version-specific failures and incomplete GMS behavior | User device testing has not been done for this candidate | Real-device test required before relying on it |
+
+### Recommended next engineering move
+
+Do not patch CalcVault's production activity, manifest, or runtime classes to attempt a quick port. The lowest-risk experiment is to keep VirtualApp_16 as an independent candidate and inspect the existing CI APK artifact, then—only if a safe test route is available—verify the APK's package/signing/ABI metadata without installing it. If the artifact can be inspected, that may help distinguish an incompatible APK/signature issue from the previous generic “App not installed” message. It still will not prove cloning works.
+
+No new branch was created, no source engine was copied, no installation was requested, and `CloneRuntime.java` was not modified by this audit.
