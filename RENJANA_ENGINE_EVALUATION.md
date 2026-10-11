@@ -212,3 +212,21 @@ This is a read-only mapping based on the pinned source files. It is not an integ
 Do not patch CalcVault's production activity, manifest, or runtime classes to attempt a quick port. The lowest-risk experiment is to keep VirtualApp_16 as an independent candidate and inspect the existing CI APK artifact, then—only if a safe test route is available—verify the APK's package/signing/ABI metadata without installing it. If the artifact can be inspected, that may help distinguish an incompatible APK/signature issue from the previous generic “App not installed” message. It still will not prove cloning works.
 
 No new branch was created, no source engine was copied, no installation was requested, and `CloneRuntime.java` was not modified by this audit.
+
+
+## Candidate APK artifact inspection — no installation performed
+
+Downloaded the existing GitHub Actions artifact locally for static inspection only.
+
+- The ZIP contains four APKs: ARM64, ARM 32-bit, x86_64, and a universal APK.
+- The universal APK contains native libraries for `arm64-v8a`, `armeabi-v7a`, and `x86_64`, including `libva++.so` and `libepic.so`.
+- The APK contains a DEX file and an APK signing-certificate entry. The certificate identifies itself as Android Debug (SHA-256 fingerprint: `A3:90:D9:42:BA:AF:0B:C6:CE:78:25:74:E2:4B:59:95:E6:15:B5:B9:68:08:DE:11:C3:E8:2F:C6:F4:B0:A9:6A`).
+- The artifact is a **debug build**, not a release-signed CalcVault build.
+
+### What this tells us about “App not installed”
+
+The APK bundle is present and includes native binaries, but static ZIP/certificate inspection cannot establish the exact cause of the earlier install failure. It could still depend on device ABI/Android version, package conflict, signature scheme, installer output, or another device-side error. I have not installed the APK and have not asked the user to install it. The APK is not a CalcVault update and must not be presented as one.
+
+### Next decision
+
+Before asking for a phone test, we should first establish the user's existing CalcVault package/signing situation and whether the candidate APK's manifest/install requirements can be decoded in CI. Do not ask the user to uninstall CalcVault or any original app. If a later test is justified, it must be explicitly described as installing a separate research app—not replacing CalcVault—and the user should be told the risks and exact steps first.
