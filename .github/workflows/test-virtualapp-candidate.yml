@@ -191,10 +191,20 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            HOST_APK="$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"
-            GUEST_APK="$(find candidate-apks -type f -path '*guest-test*' -name '*.apk' -print -quit)"
-            test -n "$HOST_APK"
-            test -n "$GUEST_APK"
+            echo "Downloaded APK files:"
+            find candidate-apks -type f -name '*.apk' -print
+            HOST_APK="$(find candidate-apks -type f -iname '*VirtualApp*universal.apk' -print -quit || true)"
+            if [ -z "$HOST_APK" ]; then
+              HOST_APK="$(find candidate-apks/candidate -type f -name '*.apk' -print -quit 2>/dev/null || true)"
+            fi
+            GUEST_APK="$(find candidate-apks -type f -path '*guest-test*' -name '*.apk' -print -quit || true)"
+            if [ -z "$GUEST_APK" ]; then
+              GUEST_APK="$(find candidate-apks -type f -name 'app-debug.apk' -print -quit || true)"
+            fi
+            if [ -z "$HOST_APK" ] || [ -z "$GUEST_APK" ]; then
+              echo "Could not locate both APKs in the downloaded artifact."
+              exit 1
+            fi
             adb install "$HOST_APK"
             adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
             sleep 15
