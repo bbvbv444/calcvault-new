@@ -52,15 +52,113 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
 
-      - name: List APK outputs
-        working-directory: candidate
-        run: find app/build/outputs/apk -type f -name '*.apk' -print
+      - name: Create harmless guest-app isolation test
+        run: |
+          mkdir -p guest-test/app/src/main/java/com/example/guestisolationtest
+          cp candidate/gradlew guest-test/gradlew
+          cp -R candidate/gradle guest-test/gradle
+          chmod +x guest-test/gradlew
+          cat > guest-test/settings.gradle <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "GuestIsolationTest"
+          include(":app")
+          EOF
+          cat > guest-test/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '7.4.2' apply false
+          }
+          EOF
+          cat > guest-test/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+          cat > guest-test/app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.example.guestisolationtest'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.example.guestisolationtest'
+                  minSdk 21
+                  targetSdk 28
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+          cat > guest-test/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:label="Guest Isolation Test" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+          cat > guest-test/app/src/main/java/com/example/guestisolationtest/MainActivity.java <<'EOF'
+          package com.example.guestisolationtest;
 
-      - name: Upload candidate APKs for review
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.graphics.Typeface;
+          import android.view.Gravity;
+          import android.widget.TextView;
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.nio.charset.StandardCharsets;
+          import java.util.UUID;
+
+          public class MainActivity extends Activity {
+              @Override public void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  String marker;
+                  File markerFile = new File(getFilesDir(), "instance-marker.txt");
+                  try {
+                      if (!markerFile.exists()) {
+                          byte[] value = ("INSTANCE-" + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8);
+                          try (FileOutputStream out = new FileOutputStream(markerFile)) { out.write(value); }
+                      }
+                      byte[] bytes = new byte[(int) markerFile.length()];
+                      try (java.io.FileInputStream in = new java.io.FileInputStream(markerFile)) {
+                          int count = in.read(bytes);
+                          marker = new String(bytes, 0, Math.max(0, count), StandardCharsets.UTF_8);
+                      }
+                  } catch (Exception e) {
+                      marker = "MARKER-ERROR-" + e.getClass().getSimpleName();
+                  }
+                  TextView view = new TextView(this);
+                  view.setGravity(Gravity.CENTER);
+                  view.setTextSize(20);
+                  view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  view.setText("GUEST_ISOLATION_TEST\n" + marker);
+                  setContentView(view);
+              }
+          }
+          EOF
+          cd guest-test
+          ./gradlew --no-daemon assembleDebug
+          cd ..
+
+      - name: List APK outputs
+        run: |
+          find candidate/app/build/outputs/apk guest-test/app/build/outputs/apk -type f -name '*.apk' -print
+
+      - name: Upload candidate and guest test APKs
         uses: actions/upload-artifact@v4
         with:
           name: virtualapp-candidate-debug-apks
-          path: candidate/app/build/outputs/apk/**/*.apk
+          path: |
+            candidate/app/build/outputs/apk/**/*.apk
+            guest-test/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 5
 
@@ -71,12 +169,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # API 30 emulator failed before the test script ran (Android settings/input services disappeared).
-        # Keep stable coverage on API 29, 34 and 35; API 30 remains unverified.
+        # API 30 emulator failed before the test script ran; API 29 and 34 are stable.
         api-level: [29, 34]
     name: Smoke test Android API ${{ matrix.api-level }}
     steps:
-      - name: Download candidate APK artifact
+      - name: Download candidate and guest APK artifacts
         uses: actions/download-artifact@v4
         with:
           name: virtualapp-candidate-debug-apks
@@ -94,12 +191,87 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            echo "Downloaded artifact contents:"
-            find candidate-apks -type f -print
-            echo "Installing candidate universal APK"
-            adb install "$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"
+            HOST_APK="$(find candidate-apks -type f -iname '*universal.apk' -print -quit)"
+            GUEST_APK="$(find candidate-apks -type f -path '*guest-test*' -name '*.apk' -print -quit)"
+            test -n "$HOST_APK"
+            test -n "$GUEST_APK"
+            adb install "$HOST_APK"
             adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
-            sleep 20
-            adb logcat -d -t 5000 > candidate-logcat.txt
-            if grep -E 'FATAL EXCEPTION.*io\.va\.exposed64|Process: io\.va\.exposed64' candidate-logcat.txt; then echo "Candidate host app reported a fatal Java crash during startup."; exit 1; fi
+            sleep 15
+            adb logcat -d -t 5000 > host-logcat.txt
+            if grep -E 'FATAL EXCEPTION.*io\.va\.exposed64|Process: io\.va\.exposed64' host-logcat.txt; then
+              echo "Candidate host app reported a fatal Java crash during startup."
+              exit 1
+            fi
             echo "Host APK installed and launch command completed without a detected fatal crash."
+
+            if [ "${{ matrix.api-level }}" = "34" ]; then
+              echo "Installing the harmless guest normally first to establish its system-instance marker."
+              adb install "$GUEST_APK"
+              adb shell monkey -p com.example.guestisolationtest -c android.intent.category.LAUNCHER 1
+              sleep 3
+              adb shell uiautomator dump /sdcard/system-window.xml >/dev/null
+              adb shell cat /sdcard/system-window.xml > system-window.xml
+              python3 - <<'PY'
+              import re
+              s = open("system-window.xml", encoding="utf-8").read()
+              m = re.search(r'INSTANCE-[0-9a-fA-F-]{36}', s)
+              if not m:
+                  raise SystemExit("Could not read the normal guest app's instance marker from the emulator UI.")
+              open("system-marker.txt", "w").write(m.group(0))
+              print("Normal Android instance marker captured.")
+              PY
+              adb shell mkdir -p /sdcard/Download
+              adb push "$GUEST_APK" /sdcard/Download/GuestIsolationTest.apk
+              echo "Opening the candidate's exported APK-import screen."
+              adb shell am start -W -a android.intent.action.VIEW -d file:///sdcard/Download/GuestIsolationTest.apk -t application/vnd.android.package-archive -n io.va.exposed64/vxp.installer
+              python3 - <<'PY'
+              import subprocess, time, xml.etree.ElementTree as ET
+              def dump():
+                  subprocess.run(["adb","shell","uiautomator","dump","/sdcard/guest-window.xml"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+                  raw=subprocess.check_output(["adb","shell","cat","/sdcard/guest-window.xml"],text=True,timeout=15)
+                  return ET.fromstring(raw)
+              def tap_text(predicate, timeout=120):
+                  end=time.time()+timeout
+                  while time.time()<end:
+                      try:
+                          root=dump()
+                          for node in root.iter("node"):
+                              label=(node.attrib.get("text","")+" "+node.attrib.get("content-desc","")).strip().lower()
+                              if predicate(label):
+                                  b=node.attrib.get("bounds","")
+                                  import re
+                                  nums=list(map(int,re.findall(r"\d+",b)))
+                                  if len(nums)==4:
+                                      x=(nums[0]+nums[2])//2; y=(nums[1]+nums[3])//2
+                                      subprocess.run(["adb","shell","input","tap",str(x),str(y)],check=True,timeout=10)
+                                      print("Tapped UI control:",label)
+                                      return
+                      except Exception:
+                          pass
+                      time.sleep(2)
+                  raise SystemExit("Timed out waiting for the expected candidate UI control.")
+              tap_text(lambda s: s.strip()=="install")
+              time.sleep(15)
+              tap_text(lambda s: "install complete and open" in s or ("complete" in s and "open" in s))
+              time.sleep(8)
+              root=dump()
+              xml=ET.tostring(root,encoding="unicode")
+              if "GUEST_ISOLATION_TEST" not in xml:
+                  raise SystemExit("The candidate did not display the guest test screen after import/open.")
+              import re
+              m=re.search(r'INSTANCE-[0-9a-fA-F-]{36}',xml)
+              if not m:
+                  raise SystemExit("Guest screen opened but its virtual instance marker could not be read.")
+              virtual_marker=m.group(0)
+              system_marker=open("system-marker.txt").read().strip()
+              print("System marker:",system_marker)
+              print("Virtual marker:",virtual_marker)
+              if virtual_marker==system_marker:
+                  raise SystemExit("FAIL: guest appears to share the normal Android app's marker; isolation not demonstrated.")
+              open("virtual-marker.txt","w").write(virtual_marker)
+              print("PASS: guest opened in candidate and its local marker differs from the normal Android instance.")
+              PY
+            else
+              echo "Guest import/data-isolation test is intentionally limited to API 34 in this run."
+            fi
