@@ -248,3 +248,16 @@ The workflow matrix has now been adjusted on this same audit branch to run stabl
 ### Next engineering checkpoint
 
 The next meaningful test is a harmless guest APK with a visible test screen and a small locally stored marker. The test must show that the candidate host can import and launch that guest, then verify whether the marker is stored separately from the normal app and survives a relaunch. Until that is implemented and passes, do not describe CalcVault cloning as working or integrate this engine into the production app.
+
+
+## Latest host smoke-test confirmation — 2026-10-12
+
+Workflow run [38215144542](https://github.com/bbvbv444/calcvault-new/actions/runs/38215144542) completed successfully. The candidate APK build passed, and the host install/launch smoke-test jobs passed on Android API 29 and API 34 emulators. This run does not test a guest app; it confirms only that the candidate host APK installs and launches in those emulator environments without the test detecting a fatal startup crash.
+
+The earlier API 30 failure was an emulator infrastructure/boot problem in a prior run, not evidence of a candidate app crash. API 30 remains unverified. The latest workflow currently tests API 29 and API 34.
+
+### Next test gate: guest app and data isolation
+
+The next step is to create a tiny, harmless test APK that displays a unique label and stores a simple local marker, then determine whether the VirtualApp host can import and launch it through the host's own app-import flow. If that works, test whether the marker is isolated from the ordinary Android installation and whether it persists after a guest relaunch. Do not claim cloning is functional until those checks pass.
+
+No CalcVault app source has been changed. The work remains on this audit branch; `main` and `CloneRuntime.java` remain untouched. No user installation is needed for the CI host smoke test.
