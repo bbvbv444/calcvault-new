@@ -230,3 +230,21 @@ The APK bundle is present and includes native binaries, but static ZIP/certifica
 ### Next decision
 
 Before asking for a phone test, we should first establish the user's existing CalcVault package/signing situation and whether the candidate APK's manifest/install requirements can be decoded in CI. Do not ask the user to uninstall CalcVault or any original app. If a later test is justified, it must be explicitly described as installing a separate research app—not replacing CalcVault—and the user should be told the risks and exact steps first.
+
+
+## Emulator smoke-test results — 2026-10-12
+
+Workflow run [38158059561](https://github.com/bbvbv444/calcvault-new/actions/runs/38158059561) completed with the candidate build job successful. The host smoke test passed on Android API 29, API 34 and API 35 emulators. The API 30 job failed before the test script could run: after the emulator reported boot completion, Android system services such as `settings` and `input` disappeared, and the emulator action's ADB calls failed. The logs do not show this as a candidate app crash, so API 30 is **unverified**, not a pass.
+
+The workflow matrix has now been adjusted on this same audit branch to run stable coverage on API 29, 34 and 35 while recording why API 30 is excluded. This does not mean every Android version is supported.
+
+### What has and has not been proven
+
+- **Proven in CI:** candidate APK build succeeds; the host app installs and its launch smoke check completes without a detected fatal crash on API 29, 34 and 35.
+- **Not proven:** a third-party guest app launches inside the candidate, app activities/services behave correctly, or guest data remains isolated.
+- **Not changed:** CalcVault app source, `main`, and `CloneRuntime.java`.
+- **User action:** no installation is needed for this CI-only step.
+
+### Next engineering checkpoint
+
+The next meaningful test is a harmless guest APK with a visible test screen and a small locally stored marker. The test must show that the candidate host can import and launch that guest, then verify whether the marker is stored separately from the normal app and survives a relaunch. Until that is implemented and passes, do not describe CalcVault cloning as working or integrate this engine into the production app.
