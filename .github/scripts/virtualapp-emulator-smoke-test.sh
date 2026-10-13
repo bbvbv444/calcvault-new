@@ -33,7 +33,7 @@ if [ "${API_LEVEL}" = "34" ]; then
   adb shell monkey -p com.example.guestisolationtest -c android.intent.category.LAUNCHER 1
   sleep 3
   adb shell uiautomator dump /sdcard/system-window.xml >/dev/null
-  adb shell cat /sdcard/system-window.xml > system-window.xml
+  adb pull /sdcard/system-window.xml system-window.xml
   python3 - <<'PY'
 import re
 s = open("system-window.xml", encoding="utf-8").read()
@@ -51,7 +51,8 @@ PY
 import re, subprocess, time, xml.etree.ElementTree as ET
 def dump():
     subprocess.run(["adb","shell","uiautomator","dump","/sdcard/guest-window.xml"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-    raw = subprocess.check_output(["adb","shell","cat","/sdcard/guest-window.xml"], text=True, timeout=15)
+    subprocess.run(["adb","pull","/sdcard/guest-window.xml","guest-window.xml"], check=True, timeout=30)
+    raw = open("guest-window.xml", encoding="utf-8").read()
     return ET.fromstring(raw)
 def tap_text(predicate, timeout=120):
     end = time.time() + timeout
