@@ -21,10 +21,19 @@ if [ -z "$HOST_APK" ] || [ -z "$GUEST_APK" ]; then
   exit 1
 fi
 
-# Disable emulator package verification for this isolated CI test; verification timed out before install on the previous run.
+# Disable the emulator's package verifier, then push the APK and invoke pm install directly.
+# The adb install wrapper timed out during Android 14 integrity verification in prior runs.
 adb shell settings put global package_verifier_enable 0 || true
 adb shell settings put global verifier_verify_adb_installs 0 || true
-adb install --no-streaming "$HOST_APK"
+echo "package_verifier_enable=$(adb shell settings get global package_verifier_enable | tr -d '\\r')"
+echo "verifier_verify_adb_installs=$(adb shell settings get global verifier_verify_adb_installs | tr -d '\\r')"
+install_apk() {
+  local apk_path="$1"
+  local remote_path="/data/local/tmp/$(basename "$apk_path")"
+  adb push "$apk_path" "$remote_path"
+  adb shell pm install -r "$remote_path"
+}
+install_apk "$HOST_APK"
 adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
 sleep 15
 adb logcat -d -t 5000 > host-logcat.txt
@@ -36,7 +45,7 @@ echo "Host APK installed and launch command completed without a detected fatal c
 
 if [ "${API_LEVEL}" = "34" ]; then
   echo "Installing harmless guest normally first to establish its system-instance marker."
-  adb install --no-streaming "$GUEST_APK"
+  install_apk "$GUEST_APK"
   adb shell monkey -p com.example.guestisolationtest -c android.intent.category.LAUNCHER 1
   sleep 3
   adb shell uiautomator dump /data/local/tmp/system-window.xml
