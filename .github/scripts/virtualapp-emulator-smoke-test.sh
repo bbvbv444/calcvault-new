@@ -32,8 +32,8 @@ if [ "${API_LEVEL}" = "34" ]; then
   adb install "$GUEST_APK"
   adb shell monkey -p com.example.guestisolationtest -c android.intent.category.LAUNCHER 1
   sleep 3
-  adb shell uiautomator dump /sdcard/system-window.xml
-  adb shell cat /sdcard/system-window.xml > system-window.xml
+  adb shell uiautomator dump /data/local/tmp/system-window.xml
+  adb exec-out cat /data/local/tmp/system-window.xml > system-window.xml
   test -s system-window.xml
   python3 - <<'PY'
 import re
@@ -51,11 +51,11 @@ PY
   python3 - <<'PY'
 import re, subprocess, time, xml.etree.ElementTree as ET
 def dump():
-    result = subprocess.run(["adb","shell","uiautomator","dump","/sdcard/guest-window.xml"], capture_output=True, text=True, timeout=30)
+    result = subprocess.run(["adb","shell","uiautomator","dump","/data/local/tmp/guest-window.xml"], capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
         raise RuntimeError("uiautomator dump failed: " + result.stderr[-500:])
     with open("guest-window.xml", "w", encoding="utf-8") as out:
-        subprocess.run(["adb","shell","cat","/sdcard/guest-window.xml"], check=True, stdout=out, timeout=30)
+        subprocess.run(["adb","exec-out","cat","/data/local/tmp/guest-window.xml"], check=True, stdout=out, timeout=30)
     if not open("guest-window.xml", encoding="utf-8").read().strip():
         raise RuntimeError("uiautomator produced an empty UI hierarchy")
     raw = open("guest-window.xml", encoding="utf-8").read()
