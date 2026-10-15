@@ -37,7 +37,7 @@ install_apk "$HOST_APK"
 adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
 sleep 15
 adb logcat -d -t 5000 > host-logcat.txt
-if grep -E 'FATAL EXCEPTION.*io\\.va\\.exposed64|Process: io\\.va\\.exposed64' host-logcat.txt; then
+if grep -E 'FATAL EXCEPTION.*io\.va\.exposed64|Process: io\.va\.exposed64' host-logcat.txt; then
   echo "Candidate host app reported a fatal Java crash during startup."
   exit 1
 fi
