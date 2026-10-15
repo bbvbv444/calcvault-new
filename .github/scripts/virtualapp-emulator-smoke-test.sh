@@ -4,7 +4,11 @@ set -eu
 echo "Downloaded APK files:"
 find candidate-apks -type f -name '*.apk' -print
 
-HOST_APK="$(find candidate-apks -type f -iname '*VirtualApp*universal.apk' -print -quit || true)"
+# Prefer the emulator's native x86_64 APK to avoid the larger multi-ABI universal APK.
+HOST_APK="$(find candidate-apks -type f -iname '*VirtualApp*x86_64.apk' -print -quit || true)"
+if [ -z "$HOST_APK" ]; then
+  HOST_APK="$(find candidate-apks -type f -iname '*VirtualApp*universal.apk' -print -quit || true)"
+fi
 if [ -z "$HOST_APK" ]; then
   HOST_APK="$(find candidate-apks/candidate -type f -name '*.apk' -print -quit 2>/dev/null || true)"
 fi
