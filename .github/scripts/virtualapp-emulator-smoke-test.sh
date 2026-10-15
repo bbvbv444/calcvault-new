@@ -17,7 +17,10 @@ if [ -z "$HOST_APK" ] || [ -z "$GUEST_APK" ]; then
   exit 1
 fi
 
-adb install "$HOST_APK"
+# Disable emulator package verification for this isolated CI test; verification timed out before install on the previous run.
+adb shell settings put global package_verifier_enable 0 || true
+adb shell settings put global verifier_verify_adb_installs 0 || true
+adb install --no-streaming "$HOST_APK"
 adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
 sleep 15
 adb logcat -d -t 5000 > host-logcat.txt
@@ -29,7 +32,7 @@ echo "Host APK installed and launch command completed without a detected fatal c
 
 if [ "${API_LEVEL}" = "34" ]; then
   echo "Installing harmless guest normally first to establish its system-instance marker."
-  adb install "$GUEST_APK"
+  adb install --no-streaming "$GUEST_APK"
   adb shell monkey -p com.example.guestisolationtest -c android.intent.category.LAUNCHER 1
   sleep 3
   adb shell uiautomator dump /data/local/tmp/system-window.xml
