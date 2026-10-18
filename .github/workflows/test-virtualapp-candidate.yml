@@ -135,6 +135,7 @@ jobs:
                   } catch (Exception e) {
                       marker = "MARKER-ERROR-" + e.getClass().getSimpleName();
                   }
+                  android.util.Log.i("GuestIsolationTest", "INSTANCE_MARKER=" + marker);
                   TextView view = new TextView(this);
                   view.setGravity(Gravity.CENTER);
                   view.setTextSize(20);
