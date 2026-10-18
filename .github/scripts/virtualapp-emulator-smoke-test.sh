@@ -31,7 +31,15 @@ install_apk() {
   local apk_path="$1"
   local remote_path="/data/local/tmp/$(basename "$apk_path")"
   adb push "$apk_path" "$remote_path"
-  adb shell pm install -r "$remote_path"
+  if ! adb shell pm install -r "$remote_path"; then
+    echo "Package Manager install failed; collecting emulator diagnostics before stopping."
+    echo "Boot completed: $(adb shell getprop sys.boot_completed 2>&1 | tr -d '\\r' || true)"
+    echo "System server process:"
+    adb shell ps -A 2>&1 | grep -E 'system_server|zygote|package' || true
+    echo "Relevant logcat errors:"
+    adb logcat -b all -d -t 10000 2>&1 | grep -Ei 'FATAL EXCEPTION|system_server|PackageManager|PackageInstaller|Watchdog|Fatal signal|lmkd|low memory|avc: denied' | tail -n 250 || true
+    return 1
+  fi
 }
 install_apk "$HOST_APK"
 adb shell monkey -p io.va.exposed64 -c android.intent.category.LAUNCHER 1
