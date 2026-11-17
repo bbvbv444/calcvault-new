@@ -161,7 +161,7 @@ jobs:
             candidate/app/build/outputs/apk/**/*.apk
             guest-test/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 30
 
   smoke-test-emulator:
     needs: build-candidate
