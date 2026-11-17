@@ -60,6 +60,10 @@ if [ "${API_LEVEL}" = "34" ]; then
   sleep 4
   read_marker_from_logcat system-marker.txt
 
+  # The Android 14 emulator restricts shared-storage directory creation for the shell user.
+  # This is an isolated CI emulator, so restart adbd as root for test-fixture staging only.
+  adb root
+  adb wait-for-device
   adb shell mkdir -p /sdcard/Download
   adb push "$GUEST_APK" /sdcard/Download/GuestIsolationTest.apk
   echo "Opening candidate APK-import screen."
