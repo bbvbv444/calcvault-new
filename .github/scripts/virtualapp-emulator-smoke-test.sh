@@ -106,9 +106,10 @@ def tap_text(predicate, timeout=120):
         time.sleep(2)
     raise SystemExit("Timed out waiting for expected candidate UI control.")
 
-# InstallerActivity starts parsing/installing automatically when given an APK URI.
-# It does not show a button labelled simply "Install"; wait for its completion state.
-tap_text(lambda s: "successfully installed" in s or "install complete and open" in s, timeout=240)
+# InstallerActivity first displays an install-confirmation screen for a system APK URI.
+# Confirm the guest import, then wait for the completion action and open the guest app.
+tap_text(lambda s: s.strip() == "install", timeout=90)
+tap_text(lambda s: "install complete and open" in s or "install complete" == s.strip(), timeout=240)
 tap_text(lambda s: "install complete and open" in s, timeout=60)
 time.sleep(8)
 # Save UI evidence for diagnosis, but use the app's log marker as the source of truth.
