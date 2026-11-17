@@ -104,7 +104,27 @@ def tap_text(predicate, timeout=120):
         except Exception as exc:
             print("Waiting for candidate UI:", str(exc)[-180:])
         time.sleep(2)
-    raise SystemExit("Timed out waiting for expected candidate UI control.")
+    # Preserve the exact screen and Android state so the next run diagnoses the real blocker.
+    try:
+        with open("installer-failure.png", "wb") as image:
+            subprocess.run(["adb","exec-out","screencap","-p"], stdout=image, check=True, timeout=30)
+    except Exception as exc:
+        print("Screenshot capture failed:", repr(exc))
+    try:
+        result = subprocess.run(["adb","shell","uiautomator","dump","/data/local/tmp/installer-failure.xml"], capture_output=True, text=True, timeout=45)
+        raw = subprocess.run(["adb","exec-out","cat","/data/local/tmp/installer-failure.xml"], capture_output=True, timeout=30)
+        if raw.returncode == 0:
+            open("installer-failure.xml","wb").write(raw.stdout)
+        with open("installer-diagnostics.txt","w",encoding="utf-8") as out:
+            out.write("UI dump result:\\n" + result.stdout + "\\n" + result.stderr)
+            for command in (["adb","shell","dumpsys","activity","activities"], ["adb","logcat","-d","-t","3000"]):
+                out.write("\\n\\nCOMMAND: " + " ".join(command) + "\\n")
+                diagnostic = subprocess.run(command, capture_output=True, text=True, timeout=45)
+                out.write((diagnostic.stdout + diagnostic.stderr)[-30000:])
+    except Exception as exc:
+        with open("installer-diagnostics.txt","a",encoding="utf-8") as out:
+            out.write("\\nDiagnostic capture failed: " + repr(exc))
+    raise SystemExit("Timed out waiting for expected candidate UI control; diagnostic files saved.")
 
 # InstallerActivity first displays an install-confirmation screen for a system APK URI.
 # Confirm the guest import, then wait for the completion action and open the guest app.
