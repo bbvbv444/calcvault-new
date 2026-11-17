@@ -197,6 +197,7 @@ jobs:
         env:
           API_LEVEL: ${{ matrix.api-level }}
 
+      # Keep installer screenshot, UI hierarchy, and Android logs even when smoke testing fails.
       - name: Upload emulator failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
